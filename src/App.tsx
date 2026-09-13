@@ -144,7 +144,7 @@ function Settings({ portfolio, onSaved }: { portfolio: Portfolio; onSaved: (valu
         <div className="field-row"><label>可承受回撤（%）<input value={profile.maxDrawdown ?? ''} onChange={event => setProfile({ ...profile, maxDrawdown: event.target.value || null })} inputMode="decimal" placeholder="尚未确定" /></label>
           <label>单只持仓上限（%）<input value={profile.maxPosition ?? ''} onChange={event => setProfile({ ...profile, maxPosition: event.target.value || null })} inputMode="decimal" placeholder="尚未确定" /></label></div>
         <label className="checkbox"><input type="checkbox" checked={profile.emailPaused} onChange={event => setProfile({ ...profile, emailPaused: event.target.checked })} />暂停每日邮件</label>
-        <p className="muted">当前邮件任务尚未接通。这里保存发送偏好，启用仍需完成邮箱配置。</p>
+        <p className="muted">保存后生效：每日任务在领取报告和提交邮件之前，都会检查这个开关。</p>
       </fieldset><button className="primary" disabled={busy || conflict}>保存偏好</button></form>
     </section>
     <div className="settings-feedback">{error && <p className="error" role="alert">{error}</p>}{message && <p className="notice" role="status">{message}</p>}

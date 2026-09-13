@@ -93,6 +93,14 @@ def parse_feed(raw, cutoff):
     return sorted(items, key=lambda item: item["publishedAt"], reverse=True)
 
 
+def news_relevance(title, positions):
+    keywords = [p["name"] for p in positions] + [p["symbol"].removesuffix('.US') for p in positions if p["symbol"].endswith('.US')]
+    keywords += ["股", "金融", "政策", "经济", "金属", "铜", "铝", "黄金", "能源", "market", "stock", "inflation", "Fed",
+                 "AI", "rate", "tariff", "bond", "economy", "oil", "metal", "bank", "regulation"]
+    return sum(bool(re.search(r'\b' + re.escape(word) + r'\b', title, re.I)) if word.isascii()
+               else word in title for word in keywords)
+
+
 def collect(snapshot, cutoff):
     positions = snapshot["positions"]
     symbols = list(dict.fromkeys([*BENCHMARKS, *(p["symbol"] for p in positions[:20])]))
@@ -103,11 +111,11 @@ def collect(snapshot, cutoff):
         try:
             items = parse_feed(fetch(url), cutoff)
             # Prefer relevant company names, then market and policy topics, then recency.
-            keywords = [p["name"] for p in positions] + ["股", "金融", "政策", "经济", "market", "stock", "inflation", "Fed", "AI"]
-            items.sort(key=lambda item: -sum(word.lower() in item["title"].lower() for word in keywords))
+            relevant = [item for item in items if publisher == '美联储' or news_relevance(item['title'], positions) > 0]
+            relevant.sort(key=lambda item: -news_relevance(item['title'], positions))
             limit = 5 if publisher != "美联储" else 2
-            news.extend({**item, "publisher": publisher} for item in items[:limit])
-            coverage.append(f"{publisher}：过去24小时检出{len(items)}条，选入{min(limit, len(items))}条；仅依据RSS摘要。")
+            news.extend({**item, "publisher": publisher} for item in relevant[:limit])
+            coverage.append(f"{publisher}：过去24小时检出{len(items)}条，选入{min(limit, len(relevant))}条；仅依据RSS摘要。")
         except Exception:
             coverage.append(f"{publisher}：本次获取失败，不代表没有新闻。")
     missing = ["未接入可靠资金净流入、两融、ETF申赎、估值、财报与完整未来事件日历；不能据此判断不存在利空。",
@@ -136,9 +144,13 @@ def portfolio_metrics(snapshot, quotes):
         value = number(p["quantity"]) * number(q["close"]) if q else None
         cost = number(p["averageCost"]) if p["averageCost"] is not None else None
         output.append({"symbol": p["symbol"], "name": p["name"], "currency": p["currency"], "horizon": p["horizon"],
+                       "assetType": p.get('assetType', 'unknown'),
                        "value": str(value) if value is not None else None,
                        "pnlPct": percent((number(q["close"]) / cost - 1) * 100) if q and cost else None,
-                       "weightPct": None, "evidenceId": q["id"] if q else None})
+                       "weightPct": None, "weightBasis": 'same_currency_assets',
+                       "maxPositionComparable": all(other['currency'] == p['currency'] for other in snapshot['positions'])
+                           and all(c == p['currency'] or amount == '0' for c, amount in snapshot['cash'].items()),
+                       "evidenceId": 'P1', "quoteEvidenceId": q["id"] if q else None})
     for currency in ("CNY", "USD"):
         group = [item for item in output if item["currency"] == currency]
         cash = snapshot["cash"][currency]

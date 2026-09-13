@@ -1,10 +1,14 @@
 from datetime import datetime, timezone
 import unittest
-from jobs.market import parse_bars, parse_feed, portfolio_metrics
+from jobs.market import parse_bars, parse_feed, portfolio_metrics, news_relevance
 from jobs.report import validate
 
 
 class MarketTests(unittest.TestCase):
+    def test_ai_keyword_does_not_match_unrelated_fair_or_paid(self):
+        self.assertEqual(news_relevance('Is this fair? I paid for dinner.', []), 0)
+        self.assertGreater(news_relevance('AI and inflation move the stock market', []), 0)
+
     def test_bars_use_exchange_date_and_exclude_incomplete_current_session(self):
         cutoff = datetime(2026, 9, 11, 0, 30, tzinfo=timezone.utc)
         stamps = [int(datetime(2026, 9, d, 20, tzinfo=timezone.utc).timestamp() * 1000) for d in (8, 9, 10, 11)]
@@ -40,6 +44,8 @@ class MarketTests(unittest.TestCase):
         rows = portfolio_metrics(snapshot, quotes)
         self.assertEqual(rows[0]['weightPct'], '50.00')
         self.assertEqual(rows[0]['pnlPct'], '25.00')
+        self.assertFalse(rows[0]['maxPositionComparable'])
+        self.assertEqual(rows[0]['evidenceId'], 'P1')
         self.assertIsNone(rows[1]['weightPct'])
         self.assertIsNone(rows[1]['pnlPct'])
         self.assertNotIn('value', rows[0])

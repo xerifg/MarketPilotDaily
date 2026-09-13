@@ -99,8 +99,9 @@ export async function reportRoute(request: Request, env: AuthEnv): Promise<Respo
   const path = new URL(request.url).pathname;
   if (request.method !== 'GET') return null;
   if (path === '/api/reports') {
-    const rows = await env.DB.prepare(`SELECT r.id, r.report_date AS reportDate, r.mode, r.state, r.created_at AS createdAt,
-      r.failure_code AS failureCode, d.state AS deliveryState FROM daily_runs r LEFT JOIN deliveries d ON d.report_id = r.id
+    const rows = await env.DB.prepare(`SELECT r.id, r.report_date AS reportDate, r.mode, r.version, r.state, r.created_at AS createdAt,
+      r.failure_code AS failureCode, d.state AS deliveryState, json_extract(p.result_json, '$.evidence.analysisStatus') AS analysisStatus
+      FROM daily_runs r LEFT JOIN deliveries d ON d.report_id = r.id LEFT JOIN reports p ON p.id = r.id
       ORDER BY r.created_at DESC LIMIT 30`).all();
     return Response.json(rows.results);
   }

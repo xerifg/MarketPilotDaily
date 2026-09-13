@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from './api';
 
-interface Run { id: string; reportDate: string; mode: string; state: string; deliveryState: string | null; createdAt: string }
+interface Run { id: string; reportDate: string; mode: string; version: number; state: string; deliveryState: string | null; createdAt: string; analysisStatus: string | null }
 interface Report { title: string; paragraphs: string[]; cutoffAt: string; model: string; estimatedCostCny: string;
   sources: { id: string; title: string; url: string; publishedAt: string }[] }
 const states: Record<string, string> = { collecting: '正在采集与分析', ready: '已生成，等待发送', failed: '生成失败，需要检查',
@@ -34,10 +34,10 @@ export function Reports({ paused }: { paused: boolean }) {
     {loading && <p role="status">正在读取记录…</p>}
     {!loading && !runs.length && <p>还没有生成记录。首次任务完成后可在这里查看真实报告。</p>}
     {runs.map(run => <div className="report-row" key={run.id}>
-      <div><strong>{run.reportDate}{run.mode === 'test' ? ' · 测试日报' : ''}</strong>
-        <p>{states[run.deliveryState ?? run.state] ?? '状态待核查'}
+      <div><strong>{run.reportDate}{run.mode === 'test' ? ` · 测试日报 第${run.version}版` : ''}</strong>
+        <p>{!run.deliveryState && run.analysisStatus === 'failed' ? 'AI 内容校验未通过，未发送' : states[run.deliveryState ?? run.state] ?? '状态待核查'}
           {run.state === 'collecting' && Date.now() - Date.parse(run.createdAt) > 45 * 60000 ? '（已超过45分钟，需要核查任务）' : ''}</p></div>
-      {run.state === 'ready' && <button className="text-button" onClick={() => { setError(''); setId(run.id); }}>阅读日报</button>}
+      {run.state === 'ready' && <button className="text-button" aria-label={`阅读${run.reportDate}第${run.version}版日报`} onClick={() => { setError(''); setId(run.id); }}>阅读日报</button>}
     </div>)}
     {report && <article className="report-content"><h2>{report.title}</h2>
       <p className="muted">截止：{new Date(report.cutoffAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}（北京时间）<br />

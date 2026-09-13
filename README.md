@@ -5,7 +5,7 @@
 
 当前设计、数据接口、开发阶段和验收标准见 [网页持仓与每日邮件实现方案](docs/web-email-implementation-plan.md)。
 
-2026-09-13 已上线持仓网页，支持 GitHub 个人登录、持仓管理、投资偏好和 Cloudflare D1 同步；真实登录、云端增删改和退出已验证。访问 [MarketPilotDaily](https://market-pilot-daily.market-pilot-daily.workers.dev)，仅允许已配置的个人账号。日报流水线与历史页面已部署，正在进行真实模型和邮件联调，每日发送仍处于暂停状态。旧 [iOS 实现方案](docs/ios-implementation-plan.md) 仅保留作历史记录。
+2026-09-13 已上线持仓网页、日报生成与历史阅读，支持 GitHub 个人登录和 Cloudflare D1 同步。访问 [MarketPilotDaily](https://market-pilot-daily.market-pilot-daily.workers.dev)，仅允许已配置的个人账号。DeepSeek 和 163 的真实联调通过，完整测试日报已获 SMTP 接受；每日发送开关已开启，首次计划于 2026-09-14 北京时间 08:30 左右发送。尚待真实定时运行及连续试用验证。旧 [iOS 实现方案](docs/ios-implementation-plan.md) 仅保留作历史记录。
 
 ## 本地启动
 
@@ -22,7 +22,7 @@ npm run dev
 
 持仓范围已确定为 A 股、美股及这两个市场上市的 ETF。新增持仓先选择市场／交易所，再输入代码：A 股例如 `510300`，美股例如 `AAPL`、`VOO`、`BRK.B`。美股零碎股可填写小数，数量最多 6 位小数。
 
-证券核验使用 TickFlow 免费接口；美股再通过 Nasdaq 官方目录核验 ETF 标记，避免把 ETF 误认为股票。服务端在新增时再次核验，无法核验的证券不会保存。这些步骤需要联网，当前没有接入价格和新闻。
+证券核验使用 TickFlow 免费接口；美股再通过 Nasdaq 官方目录核验 ETF 标记，避免把 ETF 误认为股票。服务端在新增时再次核验，无法核验的证券不会保存。这些步骤需要联网；价格和新闻由日报任务另行采集。
 
 人民币（CNY）和美元（USD）持仓、成本及现金分别记录，不直接相加。已使用旧版的本地数据库时，先运行 `npm run db:migrate:local`，再刷新网页；迁移会保留原有持仓及人民币现金。
 
