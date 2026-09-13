@@ -1,0 +1,12 @@
+{
+  "provider": "deepseek",
+  "model": "deepseek-flash",
+  "thinking": "disabled",
+  "monthlyBudgetCny": "10.00",
+  "reservePerCallCny": "0.20",
+  "maxRequestBytes": 60000,
+  "maxOutputTokens": 8192,
+  "peakInputCnyPerMillion": "2",
+  "peakOutputCnyPerMillion": "8",
+  "priceVerifiedOn": "2026-09-13"
+}

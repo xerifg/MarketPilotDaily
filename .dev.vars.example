@@ -1,0 +1,2 @@
+# Only works on a loopback host. Never set this in a cloud environment.
+LOCAL_DEV_AUTH=true
