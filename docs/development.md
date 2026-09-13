@@ -2,9 +2,9 @@
 
 日期：2026-09-13。当前状态：持仓网页、GitHub 登录、免费日线与 RSS、DeepSeek 分析、D1 预算与发送记录、163 SMTP 和报告历史页已串联。完整测试日报通过校验并获 SMTP 接受，每日发送已启用，首次计划 2026-09-14 08:30 左右。真实定时调度、连续稳定性及用户收件箱验收仍待观察。最新进度以 [邮件与任务记录](email-setup.md) 为准；下文早期阶段及 Access 部分保留作历史记录。
 
-当前部署版本：`827485a8-5c9a-44d1-b3f6-bd545eaec274`。D1 已应用 `0001`–`0006` 迁移，外键检查通过；发送开关保存为 `email_paused=0`。每日只自动使用版本 1，人工测试可显式选择版本 1–3，不覆盖已发报告。任务身份使用 GitHub OIDC；无需另外保存长期机器凭证。
+当前部署版本：`d6aae733-274c-4c5e-bb99-b8757caa8f49`。D1 已应用 `0001`–`0006` 迁移，外键检查通过；发送开关保存为 `email_paused=0`。每日只自动使用版本 1，人工测试可显式选择版本 1–3，不覆盖已发报告。任务身份使用 GitHub OIDC；无需另外保存长期机器凭证。
 
-新增接口：本人访问 `GET /api/reports` 与 `GET /api/reports/:id`；指定 GitHub 工作流访问 `/internal/runs/claim` 及其预算、报告、发送状态端点。网页身份不能调用机器端点，机器身份不能修改持仓。
+新增接口：本人访问 `GET /api/budget`、`GET /api/reports` 与 `GET /api/reports/:id`；指定 GitHub 工作流访问 `/internal/runs/claim` 及其预算、报告、发送状态端点。网页身份不能调用机器端点，机器身份不能修改持仓。
 
 首版缺口：资金净流入、两融、ETF 申赎、估值、财报、完整交易所与未来事件日历均未接入。日线最多采集 20 只持仓，新闻仅来自当前配置的三家 RSS，不承诺全网覆盖。跨币种仓位不会合并，现金或价格不全时保留未知。没有自动交易功能。
 
@@ -118,3 +118,12 @@ Python 适配器 `jobs/deepseek.py` 使用官方 HTTPS 接口与 JSON 输出；�
 - [DeepSeek JSON 输出](https://api-docs.deepseek.com/guides/json_mode/)
 - [GitHub Actions 日志访问](https://docs.github.com/en/actions/how-tos/monitor-workflows/using-workflow-run-logs)
 - [GitHub Actions Secrets](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets)
+
+
+## 日报阅读优化（2026-09-13）
+
+新增 `jobs/presentation.py` 与网页 `src/report-format.ts`，从已存证据生成可读展示；旧版保持内容不变，新版缩短提示词中的篇幅要求。邮件采用 680px 最大宽度、内联样式和纯文本备份，在 375px 宽度检查分段。网页新增预算摘要、正式推送状态、最新日报自动打开、章节导航、行情卡片与来源折叠。没有修改持仓、数据库结构或发送去重记录。
+
+预算接口在原有 owner 鉴权之后，按北京时间月份聚合；已结算、预留与不确定调用分开，不向匿名访问或机器身份开放。网页的缺失日报提示只反映本次刷新所见的发送记录，不等于主动后台监控。
+
+验证：35 项 TypeScript 与 31 项 Python 测试通过，生产构建通过；新增校验包含预算聚合与鉴权、金额/时区/缺失值、历史文本完整保留、模型 HTML 转义、失败分析不展示原始建议。

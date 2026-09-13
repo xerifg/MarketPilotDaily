@@ -3,6 +3,19 @@ import settings from '../config/ai.json';
 const monthlyLimit = Math.round(Number(settings.monthlyBudgetCny) * 1_000_000);
 const reservation = Math.round(Number(settings.reservePerCallCny) * 1_000_000);
 
+export async function getBudget(db: D1Database, now = new Date()) {
+  const month = budgetMonth(now);
+  const row = await db.prepare(`SELECT
+    COALESCE(SUM(CASE WHEN state = 'settled' THEN charged_micros ELSE 0 END), 0) AS settled,
+    COALESCE(SUM(CASE WHEN state != 'settled' THEN reserved_micros ELSE 0 END), 0) AS held,
+    COUNT(CASE WHEN state = 'uncertain' THEN 1 END) AS uncertain
+    FROM ai_calls WHERE month = ?`).bind(month).first<{ settled: number; held: number; uncertain: number }>();
+  const available = Math.max(0, monthlyLimit - row!.settled - row!.held);
+  return { month, limitCny: monthlyLimit / 1_000_000, settledCny: row!.settled / 1_000_000,
+    heldCny: row!.held / 1_000_000, availableCny: available / 1_000_000,
+    uncertainCalls: row!.uncertain, canAnalyze: available >= reservation };
+}
+
 export function budgetMonth(now: Date): string {
   const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit' }).formatToParts(now);
   return `${parts.find(part => part.type === 'year')!.value}-${parts.find(part => part.type === 'month')!.value}`;

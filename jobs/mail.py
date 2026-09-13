@@ -11,6 +11,7 @@ import smtplib
 import ssl
 from typing import Protocol
 from urllib.parse import urlsplit
+from jobs.presentation import email_body
 
 
 class MailError(Exception):
@@ -45,7 +46,7 @@ class MailConfig:
 
 
 def build_message(config: MailConfig, report_id: str, subject: str,
-                  paragraphs: list[str], sources: list[tuple[str, str]]) -> EmailMessage:
+                  paragraphs: list[str], sources: list[tuple[str, str]], report=None) -> EmailMessage:
     """Accept the report's email summary only, never the raw portfolio snapshot.
 
     All text is escaped. Source links are separately validated; model HTML is
@@ -78,21 +79,32 @@ def build_message(config: MailConfig, report_id: str, subject: str,
     text = "\n\n".join(paragraphs)
     if sources:
         text += "\n\n信息来源：\n" + "\n".join(f"{label}: {url}" for label, url in sources)
-    markup = '<!doctype html><html lang="zh-CN"><meta charset="utf-8"><body>'
-    markup += "".join(f'<p>{escape(p).replace(chr(10), "<br>")}</p>' for p in paragraphs)
+    markup = '''<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:12px;background:#f2f5f0;font-family:Arial,'Microsoft YaHei',sans-serif;color:#263c35">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:680px;background:#fff;border:1px solid #dfe8e1;border-radius:12px">
+<tr><td style="padding:26px 22px;background:#204b3c;color:#fff">
+<p style="margin:0 0 10px;font-size:12px;letter-spacing:2px">MARKETPILOT / 每日投资笔记</p>'''
+    markup += f'<h1 style="margin:0;font-size:22px;line-height:1.5">{escape(subject)}</h1></td></tr><tr><td style="padding:8px 22px 24px">'
+    if report:
+        markup += f'<p style="font-size:12px;color:#52665b">{escape(paragraphs[0])}</p>' + email_body(report)
+        markup += '<p style="margin:24px 0"><a style="display:inline-block;padding:12px 18px;background:#204b3c;color:#fff;text-decoration:none;border-radius:6px" href="https://market-pilot-daily.market-pilot-daily.workers.dev/">查看完整记录 · 管理持仓</a></p>'
+    else:
+        markup += "".join(f'<p style="margin:14px 0;line-height:1.85">{escape(p).replace(chr(10), "<br>")}</p>' for p in paragraphs)
     if sources:
-        markup += "<h2>信息来源</h2><ul>" + "".join(
-            f'<li><a href="{escape(url, quote=True)}">{escape(label)}</a></li>' for label, url in sources) + "</ul>"
+        markup += '<h2 style="font-size:17px;border-top:1px solid #dfe8e1;padding-top:20px">来源索引</h2><ul style="padding-left:18px;font-size:12px;line-height:1.7">' + "".join(
+            f'<li style="margin:8px 0"><a style="color:#356451;word-break:break-word" href="{escape(url, quote=True)}">{escape(label)}</a></li>' for label, url in sources) + "</ul>"
     message.set_content(text, cte="base64")
-    message.add_alternative(markup + "</body></html>", subtype="html", cte="base64")
+    message.add_alternative(markup + "</td></tr></table></td></tr></table></body></html>", subtype="html", cte="base64")
     if len(message.as_bytes()) > 200_000:
         raise MailError("mail_too_large")
     return message
 
 
 def send_report(config: MailConfig, gateway: DeliveryGateway, report_id: str,
-                subject: str, paragraphs: list[str], sources: list[tuple[str, str]]) -> str:
-    message = build_message(config, report_id, subject, paragraphs, sources)
+                subject: str, paragraphs: list[str], sources: list[tuple[str, str]], report=None) -> str:
+    message = build_message(config, report_id, subject, paragraphs, sources, report)
     payload = message.as_bytes()
     try:
         claimed = gateway.claim(report_id)

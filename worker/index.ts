@@ -4,6 +4,7 @@ import { authorize, authRoute, HttpError, isLocal, readBody, type AuthEnv } from
 import { lookupInstrument } from './instruments';
 import { getPortfolio, mutatePortfolio } from './portfolio';
 import { reportRoute, taskRoute } from './daily';
+import { getBudget } from './ai-budget';
 
 interface Env extends AuthEnv { DB: D1Database; ASSETS: Fetcher }
 const revisionCheck = '(SELECT revision FROM portfolio_state WHERE id = 1) = ?';
@@ -18,6 +19,9 @@ async function handle(request: Request, env: Env): Promise<Response> {
   const path = url.pathname;
   const method = request.method;
   const storage = isLocal(request, env) ? 'local' : 'cloud';
+  if (method === 'GET' && path === '/api/budget') {
+    return Response.json(await getBudget(env.DB));
+  }
   if (method === 'GET' && path === '/api/portfolio') {
     return Response.json(await getPortfolio(env.DB, storage));
   }

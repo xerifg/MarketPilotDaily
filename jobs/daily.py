@@ -60,11 +60,11 @@ def main():
                 wait = (target - datetime.now(target.tzinfo)).total_seconds()
         now = datetime.now(ZoneInfo("Asia/Shanghai"))
         late = mode == "daily" and (now.hour, now.minute) > (8, 40)
-        title = ("[测试] " if mode == "test" else "[延迟] " if late else "") + now.strftime("%Y-%m-%d ") + report["title"]
-        paragraphs = [("这是一封联调测试日报。" if mode == "test" else "每日投资观察。") + f" 实际发送时间：{now.isoformat()}。",
+        title = (f"[测试·第{version}版] " if mode == "test" else "[延迟] " if late else "") + now.strftime("%Y-%m-%d ") + report["title"]
+        paragraphs = [("这是一封联调测试日报。" if mode == "test" else "每日投资观察。") + f" 发送于 {now.strftime('%Y-%m-%d %H:%M')}（北京时间）。",
                       *report["paragraphs"], f"完整记录与持仓管理：{ORIGIN}"]
         state = send_report(config, gateway, run["id"], title, paragraphs,
-                            [(f"[{s['id']}] {s['title']}", s["url"]) for s in report["sources"]])
+                            [(f"[{s['id']}] {s['title']}", s["url"]) for s in report["sources"]], report=report)
         print("status=" + state)
         return 0 if state == "smtp_accepted" else 1
     except MailError as error:

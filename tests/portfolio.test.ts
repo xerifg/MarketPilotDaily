@@ -4,7 +4,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import type { Portfolio } from '../shared/schema';
-import { budgetMonth, reserveAiCall, settleAiCall, markAiCallUncertain } from '../worker/ai-budget';
+import { budgetMonth, getBudget, reserveAiCall, settleAiCall, markAiCallUncertain } from '../worker/ai-budget';
 
 let script: string;
 let mf: Miniflare;
@@ -282,4 +282,23 @@ test('monthly accounting follows Beijing time and preserves past month reservati
   await reserveAiCall(db, 'september', new Date('2026-09-30T15:59:59Z'));
   await reserveAiCall(db, 'october', new Date('2026-09-30T16:00:00Z'));
   assert.equal((await db.prepare('SELECT DISTINCT month FROM ai_calls').all()).results.length, 2);
+});
+
+test('budget view separates settled, pending and uncertain costs and requires owner login', async () => {
+  const now = new Date();
+  await reserveAiCall(db, 'paid', now);
+  await settleAiCall(db, 'paid', 12345);
+  await reserveAiCall(db, 'pending', now);
+  await reserveAiCall(db, 'unknown', now);
+  await markAiCallUncertain(db, 'unknown');
+  await reserveAiCall(db, 'older', new Date('2025-01-01T00:00:00Z'));
+  const summary = await getBudget(db, now);
+  assert.deepEqual(summary, { month: budgetMonth(now), limitCny: 10, settledCny: 0.012345, heldCny: 0.4,
+    availableCny: 9.587655, uncertainCalls: 1, canAnalyze: true });
+  const response = await request('/api/budget');
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  assert.deepEqual(await response.json(), summary);
+  assert.equal((await request('/api/budget', 'GET', undefined, {}, 'https://app.example.test')).status, 401);
+  assert.equal((await getBudget(db, new Date('2027-01-01T00:00:00Z'))).settledCny, 0);
 });
