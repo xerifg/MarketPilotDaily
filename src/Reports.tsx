@@ -25,6 +25,7 @@ function ReportBody({ report }: { report: Report }) {
     {advice && <>
       {evidence?.presentationVersion !== 2 && <p className="report-note">历史分析原文，仅调整排版；其中条件与阈值未按新版规则重新生成，请核对后使用。</p>}
       <section className="report-summary"><h3>先看重点</h3><Text text={advice.overview} sources={report.sources} /></section>
+      <p className="report-note">指标说明：可承受回撤不是仓位上限。本系统未计算账户历史回撤，也不能保证某个仓位对应某个回撤上限。</p>
       <nav className="report-nav" aria-label="日报目录"><a href="#plan-today">今日</a><a href="#plan-short">短期</a><a href="#plan-long">长期</a><a href="#report-market">行情</a><a href="#report-news">新闻</a></nav>
       <div className="report-plans">{sections.map(([key, title, duration]) => <section className="report-plan" key={key} id={`plan-${key}`}>
         <h3><span>{title}</span><small>{duration}</small></h3><Text text={advice[key]} sources={report.sources} />
@@ -73,12 +74,14 @@ export function Reports({ paused }: { paused: boolean }) {
   const [error, setError] = useState('');
   const [detailError, setDetailError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [refreshCount, setRefreshCount] = useState(0);
   async function refresh() {
     setLoading(true); setError('');
     const results = await Promise.allSettled([api<Run[]>('/api/reports'), api<Budget>('/api/budget')]);
     if (results[0].status === 'fulfilled') {
       const rows = results[0].value; setRuns(rows);
       setId(current => rows.some(row => row.id === current) ? current : rows.find(row => row.state === 'ready')?.id ?? '');
+      setRefreshCount(count => count + 1);
     } else setError('日报记录读取失败，请刷新重试。');
     if (results[1].status === 'fulfilled') setBudget(results[1].value);
     else { setBudget(null); setError(previous => `${previous} 预算状态暂不可用，请刷新重试。`.trim()); }
@@ -90,7 +93,7 @@ export function Reports({ paused }: { paused: boolean }) {
     if (id) api<Report>(`/api/reports/${encodeURIComponent(id)}`).then(value => { if (active) setReport(value); })
       .catch(e => { if (active) setDetailError(e instanceof Error ? e.message : '读取失败'); });
     return () => { active = false; };
-  }, [id]);
+  }, [id, refreshCount]);
   const selected = runs.find(run => run.id === id);
   const daily = runs.find(run => run.mode === 'daily');
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());

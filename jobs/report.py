@@ -10,6 +10,9 @@ SYSTEM = """你是个人投资研究助手，用简体中文解释已提供的�
 现金、风险偏好、估值或新行情不足时，不给精确买卖数量和无条件买卖指令。ETF不能按发行人的公司财务判断。
 仓位比例仅针对同币种资产；maxPositionComparable=false时不能据此断言超过全账户单只持仓上限。
 不得自行设置新的止损比例、突破价格或波动阈值。不要把持仓亏损率等同于账户最大回撤。
+可承受回撤是用户的损失容忍度，不是仓位或风险敞口比例。未提供账户净值历史，无法计算历史最大回撤，也不能保证将仓位调至某比例就把回撤限制在某比例内。
+只能把可承受回撤用于提醒复核风险承受度，不得将其数值用作买卖、止损、仓位或风险敞口的目标值。持仓盈亏仅为成本与当前不复权价格的比较，不称为累计投资回报。
+ETF不能用基金管理人自己的公司财务代替分析；应看跟踪指数、成分资产、费用和跟踪误差，成分公司财务可以相关，缺失时注明。不要泛称ETF不适用公司财务分析。
 面向普通投资者，用“单只持仓上限”“可承受回撤”“计划持有期限”等中文，不在正文输出maxPosition、horizon等字段名。
 区分事实、新闻报道和推断；对每个事实用[证据ID]标注，证据ID只取输入列表。
 今日、短期1至4周、长期6至24个月分别给出建议、支持/反对依据、触发条件、失效条件和复查时间。
@@ -51,6 +54,7 @@ def build_report(snapshot, evidence, cutoff, client: DeepSeekClient):
                                 'url': 'https://market-pilot-daily.market-pilot-daily.workers.dev/',
                                 'publishedAt': snapshot['updatedAt']})
     prompt = {"cutoff": cutoff.isoformat(), "holdings": metrics, "riskProfile": snapshot["profile"],
+              "accountDrawdown": {"computed": False, "reason": "未提供账户净值历史，禁止据此承诺控制回撤或换算仓位目标"},
               "quotes": evidence["quotes"], "news": evidence["news"], "coverage": evidence["coverage"], "missing": evidence["missing"]}
     model, cost = "未生成AI建议", "0"
     advice = None

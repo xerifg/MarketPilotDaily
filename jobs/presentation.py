@@ -8,6 +8,7 @@ from jobs.market import BENCHMARKS
 
 SECTIONS = [('overview', '先看重点'), ('today', '今日 · 行动计划'),
             ('short', '短期 · 1–4 周'), ('long', '长期 · 6–24 个月'), ('watch', '事件与风险')]
+RISK_NOTE = '指标说明：可承受回撤不是仓位上限。本系统未计算账户历史回撤，也不能保证某个仓位对应某个回撤上限。'
 
 
 def beijing(value):
@@ -82,6 +83,7 @@ def report_sections(report):
 
 def report_paragraphs(report):
     return [f"信息截止 {beijing(report['cutoffAt'])}（北京时间）｜新闻窗口：此前 24 小时｜行情：最近可取得收盘价",
+            RISK_NOTE,
             *[title + '\n' + '\n\n'.join(lines) for title, lines in report_sections(report)],
             '使用说明：先核实数据，再决定操作；本日报不自动交易。仓位按同币种计算，人民币与美元没有直接相加。']
 
@@ -92,6 +94,7 @@ def email_body(report):
         return '<p style="margin:10px 0;color:#30473e;font-size:15px;line-height:1.85;overflow-wrap:anywhere">' + escape(text).replace('\n', '<br>') + '</p>'
     markup = paragraph(f"信息截止 {beijing(report['cutoffAt'])}（北京时间） · 新闻窗口：此前 24 小时")
     markup += paragraph('行情为最近可取得收盘价；涨跌不等于资金净流入。')
+    markup += paragraph(RISK_NOTE)
     for title, lines in report_sections(report):
         markup += '<h2 style="margin:28px 0 12px;padding-bottom:10px;border-bottom:1px solid #dfe8e1;font-size:19px;color:#204b3c">' + escape(title) + '</h2>'
         if title == '市场收盘概览':
