@@ -3,13 +3,17 @@ import { addPosition, editPosition, editProfile, editCash, revisionBody, symbol 
 import { authorize, authRoute, HttpError, isLocal, readBody, type AuthEnv } from './auth';
 import { lookupInstrument } from './instruments';
 import { getPortfolio, mutatePortfolio } from './portfolio';
+import { reportRoute, taskRoute } from './daily';
 
 interface Env extends AuthEnv { DB: D1Database; ASSETS: Fetcher }
 const revisionCheck = '(SELECT revision FROM portfolio_state WHERE id = 1) = ?';
 
 async function handle(request: Request, env: Env): Promise<Response> {
+  if (new URL(request.url).pathname.startsWith('/internal/')) return taskRoute(request, env);
   const authResponse = await authRoute(request, env) ?? await authorize(request, env);
   if (authResponse) return authResponse;
+  const reportResponse = await reportRoute(request, env);
+  if (reportResponse) return reportResponse;
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method;

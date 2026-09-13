@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { horizonLabels, currencyLabels, symbol as symbolSchema, type Currency, type Instrument, type Portfolio, type Position, type Profile } from '../shared/schema';
 import { api, ApiError } from './api';
+import { Reports } from './Reports';
 
 type Tab = 'positions' | 'daily' | 'settings';
 const currencies: Currency[] = ['CNY', 'USD'];
@@ -235,11 +236,9 @@ export default function App() {
                   <td><div className="security-name">{item.name}<span className="tag">{item.assetType === 'etf' ? 'ETF' : '股票'}</span></div><div className="code">{item.symbol} · {currencyLabels[item.currency]}</div></td><td className="numeric">{item.quantity}</td><td className="numeric">{item.averageCost ?? <span className="muted">未知</span>} <span className="currency-code">{item.currency}</span></td><td>{item.horizon ? horizonLabels[item.horizon] : <span className="muted">尚未确定</span>}</td>
                   <td className="row-actions"><button className="text-button" aria-label={`编辑${item.name}`} onClick={() => setEditing(item)}>编辑</button><button className="text-button danger" aria-label={`删除${item.name}`} onClick={() => setDeleting(item)}>删除</button></td></tr>)}</tbody></table></div>}
             <div className="panel-footer">当前维护持仓快照；修改持仓不会自动生成日报或记录交易流水。</div></section>
-          <div className="next-step"><span className="next-icon">↗</span><div><h3>下一步：让持仓连接每日分析</h3><p>行情、AI 分析与 163 邮箱将在后续阶段接通，完成后可查看今日、短期和长期建议。</p></div><button className="text-button" onClick={() => setTab('daily')}>查看日报状态 →</button></div>
+          <div className="next-step"><span className="next-icon">↗</span><div><h3>持仓连接每日分析</h3><p>下一次日报使用更新后的持仓。查看已生成报告、数据覆盖和实际发送状态。</p></div><button className="text-button" onClick={() => setTab('daily')}>查看日报状态 →</button></div>
         </>}
-        {portfolio && tab === 'daily' && <section className="panel daily-empty"><span className="stage-pill">尚未启用</span><h2>你的第一份日报，还在准备中。</h2><p>当前已进入持仓管理开发阶段。AI 服务、云端任务和邮箱联调完成后，这里会显示真实生成的日报与发送记录。</p>
-          <div className="report-preview"><div><span>01</span><h3>今日关注</h3><p>过去 24 小时的市场变化<br />以及与你持仓的关系</p></div><div><span>02</span><h3>短期计划</h3><p>未来 1–4 周的事件<br />行动条件与风险</p></div><div><span>03</span><h3>长期复查</h3><p>6–24 个月投资逻辑<br />依据与失效条件</p></div></div>
-          <p className="muted">尚无生成记录 · 尚未发送邮件 · 定时调度可能延迟</p></section>}
+        {portfolio && tab === 'daily' && <Reports paused={portfolio.profile.emailPaused} />}
         {portfolio && tab === 'settings' && <Settings key={settingsKey} portfolio={portfolio} onSaved={saved} />}
         <footer className="page-footer"><span>MarketPilotDaily</span><span>记录事实 · 识别风险 · 有条件地行动</span></footer>
       </main></div>

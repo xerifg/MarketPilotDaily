@@ -8,7 +8,7 @@ export function budgetMonth(now: Date): string {
   return `${parts.find(part => part.type === 'year')!.value}-${parts.find(part => part.type === 'month')!.value}`;
 }
 
-// Called only by the future authenticated task API. No budget endpoint is public.
+// Called only by the authenticated task API. No budget endpoint is public.
 export async function reserveAiCall(db: D1Database, id: string, now = new Date()): Promise<boolean> {
   if (!/^[a-zA-Z0-9-]{1,80}$/.test(id)) throw new Error('Invalid call ID');
   const month = budgetMonth(now);

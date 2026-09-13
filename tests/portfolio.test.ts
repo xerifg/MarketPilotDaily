@@ -176,9 +176,9 @@ test('anonymous users see only the login page; forged identity headers cannot op
   }
 });
 
-test('sensitive responses are not cached and internal task endpoints remain closed', async () => {
+test('sensitive responses are not cached and browser identity cannot call task endpoints', async () => {
   assert.equal((await request('/api/portfolio')).headers.get('Cache-Control'), 'no-store');
-  assert.equal((await request('/internal/runs/claim', 'POST', {})).status, 404);
+  assert.equal((await request('/internal/runs/claim', 'POST', {})).status, 403);
 });
 
 test('missing production identity configuration fails closed even with local dev flag set', async () => {

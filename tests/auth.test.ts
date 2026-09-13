@@ -82,7 +82,7 @@ test('owner signs in with state and PKCE; only a hash of the session is stored',
   assert.equal((await db.prepare('SELECT * FROM oauth_states').all()).results.length, 0);
   assert.equal((await request(flow.path, flow.cookie)).status, 403);
   assert.equal(tokenRequests, 1);
-  assert.equal((await request('/internal/runs/claim', flow.session)).status, 404);
+  assert.equal((await request('/internal/runs/claim', flow.session)).status, 401);
 });
 
 test('missing, mismatched, expired, duplicated and replayed OAuth state cannot exchange a token', async () => {
