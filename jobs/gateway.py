@@ -3,6 +3,7 @@ import json
 import os
 import time
 from urllib.parse import urlencode, urlsplit
+from urllib.error import HTTPError
 from urllib.request import Request, build_opener
 from jobs.deepseek import NoRedirects
 
@@ -28,20 +29,29 @@ class Gateway:
             raise GatewayError("invalid_oidc_endpoint")
         request = Request(url + ("&" if "?" in url else "?") + urlencode({"audience": ORIGIN}),
                           headers={"Authorization": "Bearer " + os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"]})
-        with build_opener(NoRedirects()).open(request, timeout=25) as response:
-            self.token = json.loads(response.read(32000))["value"]
+        try:
+            with build_opener(NoRedirects()).open(request, timeout=25) as response:
+                self.token = json.loads(response.read(32000))["value"]
+        except HTTPError as error:
+            raise GatewayError(f"oidc_http_{error.code}") from None
+        except Exception:
+            raise GatewayError("oidc_request_failed") from None
         self.token_time = time.monotonic()
         return self.token
 
     def post(self, path, body):
         try:
             request = Request(ORIGIN + "/internal/" + path, data=json.dumps(body, ensure_ascii=False).encode(),
-                              headers={"Authorization": "Bearer " + self._token(), "Content-Type": "application/json"})
+                              headers={"Authorization": "Bearer " + self._token(), "Content-Type": "application/json", "User-Agent": "MarketPilotDaily/0.1"})
             with build_opener(NoRedirects()).open(request, timeout=30) as response:
                 raw = response.read(250001)
                 if len(raw) > 250000:
                     raise GatewayError("response_too_large")
                 return json.loads(raw)
+        except GatewayError:
+            raise
+        except HTTPError as error:
+            raise GatewayError(f"task_api_http_{error.code}") from None
         except Exception:
             raise GatewayError("task_api_failed") from None
 

@@ -5,7 +5,7 @@ import sys
 import time
 from zoneinfo import ZoneInfo
 from jobs.deepseek import DeepSeekClient
-from jobs.gateway import Gateway, ORIGIN
+from jobs.gateway import Gateway, GatewayError, ORIGIN
 from jobs.mail import MailConfig, MailError, send_report
 from jobs.market import collect
 from jobs.report import build_report
@@ -14,6 +14,7 @@ from jobs.report import build_report
 def main():
     gateway = Gateway()
     report_saved = False
+    stage = 'configuration'
     try:
         config = MailConfig(os.environ["SMTP_USERNAME"], os.environ["SMTP_AUTH_CODE"], os.environ["MAIL_FROM"], os.environ["MAIL_TO"])
         config.validate()
@@ -23,6 +24,7 @@ def main():
         mode = os.environ.get("REPORT_MODE", "daily")
         if mode not in ("daily", "test"):
             raise ValueError("invalid_mode")
+        stage = 'claim'
         run = gateway.post("runs/claim", {"mode": mode})
         if run.get("skipped"):
             print("status=paused")
@@ -36,6 +38,7 @@ def main():
             if not run["owned"] or run["state"] != "collecting":
                 print("status=run_needs_review")
                 return 1
+            stage = 'generation'
             cutoff = datetime.now(timezone.utc)
             evidence = collect(run["snapshot"], cutoff)
             report = build_report(run["snapshot"], evidence, cutoff, DeepSeekClient(key, gateway))
@@ -63,13 +66,13 @@ def main():
     except MailError as error:
         print("status=" + str(error))  # MailError is restricted to code constants.
         return 1
-    except Exception:
+    except Exception as error:
         if gateway.run_id and not report_saved:
             try:
                 gateway.action("failed", {"code": "generation_or_storage_failed"})
             except Exception:
                 pass
-        print("status=task_failed_check_private_dashboard")
+        print("status=" + (str(error) if isinstance(error, GatewayError) else stage + "_failed"))
         return 1
 
 
