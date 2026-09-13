@@ -20,3 +20,9 @@ test('legacy paragraph breaks preserve all content, and unsafe source URLs are n
   assert.equal(safeUrl('https://user:pass@example.com'), undefined);
   assert.equal(safeUrl('https://example.com/?a=1'), 'https://example.com/?a=1');
 });
+
+test('missing quote source dates do not crash the report reader', () => {
+  for (const value of ['未知', '', 'invalid timestamp']) {
+    assert.equal(beijing(value), '时间未知');
+  }
+});

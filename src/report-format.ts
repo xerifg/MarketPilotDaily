@@ -11,9 +11,11 @@ export const benchmarks: Record<string, string> = { '000001.SH': '上证指数',
   'SPY.US': 'SPY · 标普 500 ETF', 'QQQ.US': 'QQQ · 纳斯达克 100 ETF' };
 export const sections = [['today', '今日', '行动计划'], ['short', '短期', '1–4 周'], ['long', '长期', '6–24 个月']] as const;
 export function beijing(value: string) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '时间未知';
   if (value.length === 10) return value;
   return new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit',
-    day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(value));
+    day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date);
 }
 export function number(value: string | null | undefined, amount = false, signed = false) {
   if (value === null || value === undefined || value === '' || !Number.isFinite(Number(value))) return '未提供';

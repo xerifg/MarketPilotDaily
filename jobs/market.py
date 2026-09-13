@@ -90,7 +90,7 @@ def parse_feed(raw, cutoff):
                           "summary": clean(item.findtext("description", ""))[:160], "publishedAt": stamp.isoformat()})
         except (ValueError, TypeError):
             continue
-    return sorted(items, key=lambda item: item["publishedAt"], reverse=True)
+    return sorted(items, key=lambda item: datetime.fromisoformat(item["publishedAt"]), reverse=True)
 
 
 def news_relevance(title, positions):

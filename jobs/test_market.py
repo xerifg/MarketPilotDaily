@@ -5,6 +5,13 @@ from jobs.report import validate
 
 
 class MarketTests(unittest.TestCase):
+    def test_news_recency_uses_actual_time_across_time_zones(self):
+        items = ''.join(f'<item><title>{title}</title><link>https://example.com/{title}</link><pubDate>{stamp}</pubDate></item>'
+                        for title, stamp in [('older', 'Sun, 13 Sep 2026 08:00:00 +0800'),
+                                             ('newer', 'Sun, 13 Sep 2026 01:00:00 GMT')])
+        rows = parse_feed(('<rss><channel>' + items + '</channel></rss>').encode(), datetime(2026, 9, 13, 2, tzinfo=timezone.utc))
+        self.assertEqual([row['title'] for row in rows], ['newer', 'older'])
+
     def test_ai_keyword_does_not_match_unrelated_fair_or_paid(self):
         self.assertEqual(news_relevance('Is this fair? I paid for dinner.', []), 0)
         self.assertGreater(news_relevance('AI and inflation move the stock market', []), 0)
