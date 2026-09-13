@@ -25,7 +25,8 @@ def main():
         if mode not in ("daily", "test"):
             raise ValueError("invalid_mode")
         stage = 'claim'
-        run = gateway.post("runs/claim", {"mode": mode})
+        version = int(os.environ.get('REPORT_VERSION', '1')) if mode == 'test' else 1
+        run = gateway.post("runs/claim", {"mode": mode, "version": version})
         if run.get("skipped"):
             print("status=paused")
             return 0
@@ -44,6 +45,9 @@ def main():
             report = build_report(run["snapshot"], evidence, cutoff, DeepSeekClient(key, gateway))
             gateway.action("report", report)
         report_saved = True
+        if mode == 'test' and report['evidence'].get('analysisStatus') == 'failed':
+            print('status=test_analysis_needs_review')
+            return 1
         if mode == "daily":
             now = datetime.now(ZoneInfo("Asia/Shanghai"))
             target = now.replace(hour=8, minute=30, second=0, microsecond=0)

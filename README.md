@@ -5,7 +5,7 @@
 
 当前设计、数据接口、开发阶段和验收标准见 [网页持仓与每日邮件实现方案](docs/web-email-implementation-plan.md)。
 
-2026-09-13 已上线持仓网页，支持 GitHub 个人登录、持仓管理、投资偏好和 Cloudflare D1 同步；真实登录、云端增删改和退出已验证。访问 [MarketPilotDaily](https://market-pilot-daily.market-pilot-daily.workers.dev)，仅允许已配置的个人账号。AI 日报、定时任务和 163 邮件仍未接通。旧 [iOS 实现方案](docs/ios-implementation-plan.md) 仅保留作历史记录。
+2026-09-13 已上线持仓网页，支持 GitHub 个人登录、持仓管理、投资偏好和 Cloudflare D1 同步；真实登录、云端增删改和退出已验证。访问 [MarketPilotDaily](https://market-pilot-daily.market-pilot-daily.workers.dev)，仅允许已配置的个人账号。日报流水线与历史页面已部署，正在进行真实模型和邮件联调，每日发送仍处于暂停状态。旧 [iOS 实现方案](docs/ios-implementation-plan.md) 仅保留作历史记录。
 
 ## 本地启动
 
@@ -28,6 +28,7 @@ npm run dev
 
 ```powershell
 npm test
+python -m pip install -r requirements.txt
 python -m unittest discover -s jobs -p 'test_*.py' -v
 npm run build
 ```
@@ -41,9 +42,11 @@ npm run build
 - 现金、风险偏好、暂停发送偏好；未填写值保持未知。
 - 数据库事务、版本检查、并发冲突提示；失败时保留表单。
 - GitHub OAuth 登录与固定用户 ID 白名单，24 小时会话、服务端退出撤销；配置缺失时拒绝访问。
-- 桌面与手机布局；日报页展示实际“尚未启用”状态。
-- DeepSeek 标准对话模式适配器与 D1 月度预算基础模块；尚未连接实际日报任务。配置见 `config/ai.json`，月度预算 10 元，测试不产生 API 费用。
-- 163 TLS 邮件适配器，包含纯文本／HTML 邮件、安全转义、发送状态分类和禁止自动重发；尚未连接持久化发送网关和定时任务。配置进度见 [邮件配置](docs/email-setup.md)。
+- 桌面与手机布局；日报页展示最近 30 次真实任务、报告、来源与发送记录。
+- DeepSeek 标准对话模式与 D1 持久化预算网关。配置见 `config/ai.json`，月度预算 10 元；自动测试不产生 API 费用。
+- GitHub Actions 08:15 北京时间启动，目标 08:30 发送；使用 OIDC 短期身份，只允许本仓库 main 上指定工作流访问任务 API。
+- 免费日线与国内外 RSS；只使用实际取得的证据。没有接入资金净流入、ETF 申赎、完整交易日历与未来事件日历，报告明确显示缺口。
+- 163 TLS 邮件、纯文本／HTML 正文、安全转义、D1 发送状态分类与防重复。配置与联调进度见 [邮件配置](docs/email-setup.md)。
 
 用户已确认使用 Cloudflare 免费账号与 DeepSeek，并改用 GitHub 登录，无需开通 Access。保留当前公开仓库：代码公开不等于持仓公开，真实持仓和报告保存在受保护的 D1，凭证放入 Secrets，不能写进公开日志或构建附件。GitHub 应用与云端 Secret 已配置完成。配置与实际进度见 [GitHub 登录](docs/github-login.md)。
 

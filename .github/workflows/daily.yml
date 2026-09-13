@@ -9,6 +9,11 @@ on:
         type: choice
         options: [test, daily]
         default: test
+      version:
+        description: 'Explicit test version; daily always uses version 1'
+        type: choice
+        options: ['1', '2', '3']
+        default: '1'
 permissions:
   contents: read
 concurrency:
@@ -33,6 +38,7 @@ jobs:
       - name: Generate and send report
         env:
           REPORT_MODE: ${{ github.event.inputs.mode || 'daily' }}
+          REPORT_VERSION: ${{ github.event.inputs.version || '1' }}
           SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
           SMTP_AUTH_CODE: ${{ secrets.SMTP_AUTH_CODE }}
           MAIL_FROM: ${{ secrets.MAIL_FROM }}

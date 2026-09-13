@@ -4,7 +4,7 @@ import { authorizeTask } from './task-auth';
 import { getPortfolio } from './portfolio';
 import { reserveAiCall, settleAiCall, markAiCallUncertain } from './ai-budget';
 
-const idSchema = z.string().regex(/^(daily|test)-\d{4}-\d{2}-\d{2}$/);
+const idSchema = z.string().regex(/^(daily|test)-\d{4}-\d{2}-\d{2}(?:-v[23])?$/);
 const text = z.string().max(6000);
 const resultSchema = z.object({
   title: z.string().min(1).max(200), paragraphs: z.array(text).min(1).max(100),
@@ -43,15 +43,16 @@ export async function taskRoute(request: Request, env: AuthEnv): Promise<Respons
   const path = new URL(request.url).pathname;
   const input = await body(request);
   if (path === '/internal/runs/claim') {
-    const { mode } = z.object({ mode: z.enum(['daily', 'test']) }).strict().parse(input);
-    const date = today(); const id = `${mode}-${date}`;
+    const { mode, version } = z.object({ mode: z.enum(['daily', 'test']), version: z.number().int().min(1).max(3).default(1) }).strict().parse(input);
+    if (mode === 'daily' && version !== 1) throw new HttpError(400, '每日任务不允许自动重生成。');
+    const date = today(); const id = `${mode}-${date}${version > 1 ? `-v${version}` : ''}`;
     const existing = await env.DB.prepare('SELECT id FROM daily_runs WHERE id = ?').bind(id).first();
     if (!existing) {
       const snapshot = await getPortfolio(env.DB, 'cloud');
       if (mode === 'daily' && snapshot.profile.emailPaused) return Response.json({ skipped: 'paused' });
-      await env.DB.prepare(`INSERT INTO daily_runs (id, report_date, mode, github_run_id, state, snapshot_json, created_at)
-        SELECT ?, ?, ?, ?, 'collecting', ?, ? WHERE (SELECT revision FROM portfolio_state WHERE id = 1) = ?
-        ON CONFLICT(id) DO NOTHING`).bind(id, date, mode, githubRunId, JSON.stringify(snapshot), new Date().toISOString(), snapshot.revision).run();
+      await env.DB.prepare(`INSERT INTO daily_runs (id, report_date, mode, version, github_run_id, state, snapshot_json, created_at)
+        SELECT ?, ?, ?, ?, ?, 'collecting', ?, ? WHERE (SELECT revision FROM portfolio_state WHERE id = 1) = ?
+        ON CONFLICT(id) DO NOTHING`).bind(id, date, mode, version, githubRunId, JSON.stringify(snapshot), new Date().toISOString(), snapshot.revision).run();
     }
     const run = await getRun(env.DB, id);
     const report = await env.DB.prepare('SELECT result_json FROM reports WHERE id = ?').bind(id).first<{ result_json: string }>();

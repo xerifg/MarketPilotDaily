@@ -64,6 +64,9 @@ test('daily pause, immutable snapshot, budget and once-only delivery persist acr
   await db.prepare('UPDATE portfolio_state SET revision = revision + 1 WHERE id = 1').run();
   const again = await (await post('runs/claim', { mode: 'test' }, jwt)).json() as typeof run;
   assert.equal(again.snapshot.revision, run.snapshot.revision);
+  assert.equal((await post('runs/claim', { mode: 'daily', version: 2 }, jwt)).status, 400);
+  const second = await (await post('runs/claim', { mode: 'test', version: 2 }, jwt)).json() as { id: string };
+  assert.equal(second.id, `${run.id}-v2`);
   assert.deepEqual(await (await post(`runs/${run.id}/ai-reserve`, {}, jwt)).json(), { allowed: true });
   assert.deepEqual(await (await post(`runs/${run.id}/ai-reserve`, {}, jwt)).json(), { allowed: false });
   assert.equal((await post(`runs/${run.id}/ai-settle`, { chargedMicros: 9000 }, jwt)).status, 200);

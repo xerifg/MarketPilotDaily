@@ -44,12 +44,16 @@ def build_report(snapshot, evidence, cutoff, client: DeepSeekClient):
               "quotes": evidence["quotes"], "news": evidence["news"], "coverage": evidence["coverage"], "missing": evidence["missing"]}
     model, cost = "未生成AI建议", "0"
     advice = None
+    raw = None
+    analysis_error = None
     try:
         completion = client.complete_json("daily", [{"role": "system", "content": SYSTEM},
                                                     {"role": "user", "content": json.dumps(prompt, ensure_ascii=False)}])
         model, cost = completion.model, str(completion.estimated_cost_cny)
+        raw = completion.content
         advice = validate(completion.content, metrics, evidence)
-    except (DeepSeekError, ValueError, TypeError, KeyError):
+    except (DeepSeekError, ValueError, TypeError, KeyError) as error:
+        analysis_error = str(error) if isinstance(error, (DeepSeekError, ValueError)) else 'invalid_report_structure'
         if cost == "0":
             cost = "未知或未调用，以预算账本为准"
     paragraphs = [f"信息截止：{cutoff.isoformat()}。新闻窗口为此前24小时；行情使用下列交易日，不是实时行情。持仓快照版本：v{snapshot['revision']}。",
@@ -76,4 +80,6 @@ def build_report(snapshot, evidence, cutoff, client: DeepSeekClient):
     paragraphs.append("数据覆盖与限制\n" + "\n".join(evidence["coverage"] + evidence["missing"]))
     paragraphs.append("使用说明：先核实数据与交易规则，再结合可承受损失决定；本日报不自动交易。仓位按同币种计算，人民币与美元没有直接相加。")
     return {"title": "MarketPilotDaily 每日投资观察", "paragraphs": paragraphs, "sources": evidence["sources"],
-            "evidence": {**evidence, "metrics": metrics}, "model": model, "estimatedCostCny": cost, "cutoffAt": cutoff.isoformat()}
+            "evidence": {**evidence, "metrics": metrics, "analysisStatus": 'ok' if advice else 'failed',
+                         "analysisError": analysis_error, "analysisRaw": raw},
+            "model": model, "estimatedCostCny": cost, "cutoffAt": cutoff.isoformat()}
