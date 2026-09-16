@@ -3,9 +3,15 @@ export interface Quote { id: string; symbol: string; missing?: boolean; close: s
   sessionDate: string; previousSessionDate: string; amount: string | null; stale: boolean }
 export interface Analysis { overview: string; today: string; short: string; long: string; watch: string;
   holdings: { symbol: string; advice: string }[] }
+export interface FlowRow { code: string; name: string; date: string; net: string; net5: string | null;
+  stale: boolean; sourceIds: string[]; sourceUrl: string; previousDate?: string; shareChange?: string; navDate?: string }
+export interface FlowGroup { status: 'ok' | 'partial' | 'missing'; date: string | null; rows: FlowRow[];
+  expectedCount: number; note: string }
+export interface FundFlows { industry: FlowGroup; etf: FlowGroup; fetchedAt: string; limitations: string[];
+  holdings: { symbol: string; name: string; kind: string; flow: FlowRow | null; industryCode: string | null; note: string }[] }
 export interface Report { title: string; paragraphs: string[]; cutoffAt: string; model: string; estimatedCostCny: string; sources: Source[];
   evidence?: { presentationVersion?: number; analysisStatus?: string; analysisRaw?: Analysis | null;
-    quotes?: Quote[]; news?: Source[]; coverage?: string[]; missing?: string[];
+    quotes?: Quote[]; news?: Source[]; coverage?: string[]; missing?: string[]; fundFlows?: FundFlows;
     metrics?: { symbol: string; name: string; currency: string; weightPct: string | null; pnlPct: string | null }[] } }
 export const benchmarks: Record<string, string> = { '000001.SH': '上证指数', '399001.SZ': '深证成指',
   'SPY.US': 'SPY · 标普 500 ETF', 'QQQ.US': 'QQQ · 纳斯达克 100 ETF' };

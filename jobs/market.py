@@ -10,6 +10,7 @@ from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 import xml.etree.ElementTree as ET
 from zoneinfo import ZoneInfo
+from jobs.fund_flows import collect_flows, flow_sources
 
 BENCHMARKS = {"000001.SH": "上证指数", "399001.SZ": "深证成指", "SPY.US": "SPY（标普500 ETF）", "QQQ.US": "QQQ（纳斯达克100 ETF）"}
 FEEDS = [("中新网财经", "https://www.chinanews.com.cn/rss/finance.xml"),
@@ -118,7 +119,10 @@ def collect(snapshot, cutoff):
             coverage.append(f"{publisher}：过去24小时检出{len(items)}条，选入{min(limit, len(relevant))}条；仅依据RSS摘要。")
         except Exception:
             coverage.append(f"{publisher}：本次获取失败，不代表没有新闻。")
-    missing = ["未接入可靠资金净流入、两融、ETF申赎、估值、财报与完整未来事件日历；不能据此判断不存在利空。",
+    flows = collect_flows(positions, cutoff)
+    # Reserve four flow sources and one portfolio source within the 40-source limit.
+    news = news[:max(0, 35 - len(quotes))]
+    missing = ["未接入两融、估值、财报与完整未来事件日历；不能据此判断不存在利空。",
                "未核验完整交易所节假日历；行情为最近可取得日线，开市与交易限制需另行确认。",
                "涨跌为不复权收盘价变化，除权除息可能影响；不代表含分红总回报。"]
     if not positions:
@@ -133,7 +137,10 @@ def collect(snapshot, cutoff):
     for article in news:
         article["id"] = f"N{len(sources)+1}"
         sources.append({k: article[k] for k in ("id", "title", "url", "publishedAt")})
-    return {"quotes": quotes, "news": news, "coverage": coverage, "missing": missing, "sources": sources}
+    sources.extend(flow_sources(flows))
+    missing.extend(flows['limitations'])
+    coverage.append(f"资金数据：行业 {len(flows['industry']['rows'])} 项，沪市ETF观察池 {len(flows['etf']['rows'])} 项，关联持仓 {len(flows['holdings'])} 项。")
+    return {"quotes": quotes, "news": news, "coverage": coverage, "missing": missing, "sources": sources, "fundFlows": flows}
 
 
 def portfolio_metrics(snapshot, quotes):

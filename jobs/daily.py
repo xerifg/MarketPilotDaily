@@ -5,7 +5,7 @@ import sys
 import time
 from zoneinfo import ZoneInfo
 from jobs.deepseek import DeepSeekClient
-from jobs.gateway import Gateway, GatewayError, ORIGIN
+from jobs.gateway import Gateway, GatewayError
 from jobs.mail import MailConfig, MailError, send_report
 from jobs.market import collect
 from jobs.report import build_report
@@ -50,7 +50,7 @@ def main():
             return 1
         if mode == "daily":
             now = datetime.now(ZoneInfo("Asia/Shanghai"))
-            target = now.replace(hour=8, minute=30, second=0, microsecond=0)
+            target = now.replace(hour=5, minute=15, second=0, microsecond=0)
             wait = (target - now).total_seconds()
             if wait > 1800:
                 print("status=outside_delivery_window")
@@ -59,12 +59,10 @@ def main():
                 time.sleep(min(wait, 30))
                 wait = (target - datetime.now(target.tzinfo)).total_seconds()
         now = datetime.now(ZoneInfo("Asia/Shanghai"))
-        late = mode == "daily" and (now.hour, now.minute) > (8, 40)
+        late = mode == "daily" and (now.hour, now.minute) > (5, 25)
         title = (f"[测试·第{version}版] " if mode == "test" else "[延迟] " if late else "") + now.strftime("%Y-%m-%d ") + report["title"]
-        paragraphs = [("这是一封联调测试日报。" if mode == "test" else "每日投资观察。") + f" 发送于 {now.strftime('%Y-%m-%d %H:%M')}（北京时间）。",
-                      *report["paragraphs"], f"完整记录与持仓管理：{ORIGIN}"]
-        state = send_report(config, gateway, run["id"], title, paragraphs,
-                            [(f"[{s['id']}] {s['title']}", s["url"]) for s in report["sources"]], report=report)
+        paragraphs = [("这是一封联调测试日报。" if mode == "test" else "每日投资观察。") + f" 发送于 {now.strftime('%Y-%m-%d %H:%M')}（北京时间）。"]
+        state = send_report(config, gateway, run["id"], title, paragraphs, [], report=report)
         print("status=" + state)
         return 0 if state == "smtp_accepted" else 1
     except MailError as error:

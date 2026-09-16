@@ -5,6 +5,8 @@ from html import escape
 import re
 from zoneinfo import ZoneInfo
 from jobs.market import BENCHMARKS
+from jobs.email_summary import email_sections
+from jobs.flow_presentation import full_flow_sections
 
 SECTIONS = [('overview', '先看重点'), ('today', '今日 · 行动计划'),
             ('short', '短期 · 1–4 周'), ('long', '长期 · 6–24 个月'), ('watch', '事件与风险')]
@@ -75,6 +77,7 @@ def report_sections(report):
                           f"{' ' + quote['currency'] if quote.get('amount') else ''} [{quote['id']}]"
                           + (' · 数据偏旧，不能作为今日触发依据' if quote.get('stale') else ''))
     sections.append(('市场收盘概览', market or ['本期无可用行情。']))
+    sections.extend(full_flow_sections(evidence.get('fundFlows')))
     sections.append(('过去 24 小时 · 新闻线索', [f"{item['title']} [{item['id']}]\n{beijing(item['publishedAt'])}（北京时间）"
                     for item in evidence.get('news', [])] or ['本期未检出符合时间窗口的相关新闻；不代表没有市场事件。']))
     sections.append(('数据覆盖与限制', evidence.get('coverage', []) + evidence.get('missing', [])))
@@ -88,25 +91,17 @@ def report_paragraphs(report):
             '使用说明：先核实数据，再决定操作；本日报不自动交易。仓位按同币种计算，人民币与美元没有直接相加。']
 
 
+def email_paragraphs(report):
+    return [f"信息截止 {beijing(report['cutoffAt'])}（北京时间）｜新闻窗口：此前 24 小时｜行情：最近可取得收盘价",
+            *[title + '\n' + '\n\n'.join(lines) for title, lines in email_sections(report)]]
+
+
 def email_body(report):
     """Return HTML content only. Mail transport validates all external links."""
     def paragraph(text):
         return '<p style="margin:10px 0;color:#30473e;font-size:15px;line-height:1.85;overflow-wrap:anywhere">' + escape(text).replace('\n', '<br>') + '</p>'
-    markup = paragraph(f"信息截止 {beijing(report['cutoffAt'])}（北京时间） · 新闻窗口：此前 24 小时")
-    markup += paragraph('行情为最近可取得收盘价；涨跌不等于资金净流入。')
-    markup += paragraph(RISK_NOTE)
-    for title, lines in report_sections(report):
+    markup = paragraph(email_paragraphs(report)[0])
+    for title, lines in email_sections(report):
         markup += '<h2 style="margin:28px 0 12px;padding-bottom:10px;border-bottom:1px solid #dfe8e1;font-size:19px;color:#204b3c">' + escape(title) + '</h2>'
-        if title == '市场收盘概览':
-            for line in lines:
-                headline, _, details = line.partition('\n')
-                cells = headline.split('｜')
-                markup += '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:10px 0;border:1px solid #dfe8e1;border-radius:6px"><tr><td style="padding:12px 14px">'
-                markup += '<strong style="font-size:14px;color:#30473e">' + escape(cells[0]) + '</strong>'
-                if len(cells) == 3:
-                    markup += '<p style="margin:6px 0;font-size:20px;color:#204b3c">' + escape(cells[1]) + ' <span style="font-size:15px">' + escape(cells[2]) + '</span></p>'
-                markup += '<p style="margin:6px 0;font-size:12px;line-height:1.8;color:#52665b">' + escape(details) + '</p></td></tr></table>'
-        else:
-            markup += ''.join(paragraph(line) for line in lines)
-    markup += paragraph('先核实数据，再决定操作；本日报不自动交易。仓位按同币种计算，人民币与美元没有直接相加。')
+        markup += ''.join(paragraph(line) for line in lines)
     return markup

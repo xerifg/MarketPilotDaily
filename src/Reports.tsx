@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState } from 'react';
 import { api } from './api';
+import { FundFlows } from './FundFlows';
 import { beijing, benchmarks, number, readingLines, safeUrl, sections, type Report, type Source } from './report-format';
 
 interface Run { id: string; reportDate: string; mode: string; version: number; state: string; deliveryState: string | null; createdAt: string; analysisStatus: string | null }
@@ -9,7 +10,7 @@ const states: Record<string, string> = { collecting: '正在采集与分析', re
   smtp_rejected: '163 拒绝接收', failed_before_data: '发送前失败', delivery_uncertain: '发送结果不确定，已停止自动重发' };
 
 function Text({ text, sources }: { text: string; sources: Source[] }) {
-  return <>{readingLines(text).map((line, i) => <p className="report-paragraph" key={i}>{line.split(/(\[[QNP]\d+\])/g).map((part, j) => {
+  return <>{readingLines(text).map((line, i) => <p className="report-paragraph" key={i}>{line.split(/(\[[QNPF]\d+\])/g).map((part, j) => {
     const source = sources.find(s => `[${s.id}]` === part);
     return source ? <a key={j} className="citation" href={safeUrl(source.url)} target="_blank" rel="noopener noreferrer" title={source.title}>{part}</a> : <Fragment key={j}>{part}</Fragment>;
   })}</p>)}</>;
@@ -26,7 +27,7 @@ function ReportBody({ report }: { report: Report }) {
       {evidence?.presentationVersion !== 2 && <p className="report-note">历史分析原文，仅调整排版；其中条件与阈值未按新版规则重新生成，请核对后使用。</p>}
       <section className="report-summary"><h3>先看重点</h3><Text text={advice.overview} sources={report.sources} /></section>
       <p className="report-note">指标说明：可承受回撤不是仓位上限。本系统未计算账户历史回撤，也不能保证某个仓位对应某个回撤上限。</p>
-      <nav className="report-nav" aria-label="日报目录"><a href="#plan-today">今日</a><a href="#plan-short">短期</a><a href="#plan-long">长期</a><a href="#report-market">行情</a><a href="#report-news">新闻</a></nav>
+      <nav className="report-nav" aria-label="日报目录"><a href="#plan-today">今日</a><a href="#plan-short">短期</a><a href="#plan-long">长期</a><a href="#report-market">行情</a>{evidence?.fundFlows && <a href="#report-flows">资金</a>}<a href="#report-news">新闻</a></nav>
       <div className="report-plans">{sections.map(([key, title, duration]) => <section className="report-plan" key={key} id={`plan-${key}`}>
         <h3><span>{title}</span><small>{duration}</small></h3><Text text={advice[key]} sources={report.sources} />
       </section>)}</div>
@@ -49,6 +50,7 @@ function ReportBody({ report }: { report: Report }) {
             <p>成交额 {number(quote.amount, true)}{quote.amount ? ` ${quote.currency}` : ''} <TextCitation id={quote.id} sources={report.sources} /></p>
             {quote.stale && <p className="quote-stale">数据偏旧，不能作为今日触发依据</p>}</>}
         </div>)}</div></section>
+      {evidence.fundFlows && <FundFlows flows={evidence.fundFlows} />}
       <section className="report-section" id="report-news"><h3>过去 24 小时 · 新闻线索</h3><p className="report-note">依据 RSS 标题与摘要，尚未核验全文。英文标题保留原文。</p>
         {evidence.news?.length ? <ol className="report-news">{evidence.news.map(item => <li key={item.id}><a href={safeUrl(item.url)} target="_blank" rel="noopener noreferrer">{item.title}</a><small>{beijing(item.publishedAt)} · 北京时间 · [{item.id}]</small></li>)}</ol> : <p>本期未检出符合时间窗口的相关新闻，不代表没有市场事件。</p>}
       </section>
@@ -98,9 +100,9 @@ export function Reports({ paused }: { paused: boolean }) {
   const daily = runs.find(run => run.mode === 'daily');
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
   const hour = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Shanghai', hour: '2-digit', hourCycle: 'h23' }).format(new Date()));
-  const missingDaily = !paused && !loading && !error && hour >= 9 && !runs.some(run => run.mode === 'daily' && run.reportDate === today && run.deliveryState === 'smtp_accepted');
+  const missingDaily = !paused && !loading && !error && hour >= 6 && !runs.some(run => run.mode === 'daily' && run.reportDate === today && run.deliveryState === 'smtp_accepted');
   return <section className="panel report-panel">
-    <div className="report-status-grid"><div><span>每日邮件</span><strong>{paused ? '已暂停' : '08:30 · 北京时间'}</strong><p>08:15 准备，GitHub 调度可能延迟</p></div>
+    <div className="report-status-grid"><div><span>每日邮件</span><strong>{paused ? '已暂停' : '05:15 · 北京时间'}</strong><p>05:00 准备，GitHub 调度可能延迟</p></div>
       <div><span>{budget ? `${budget.month} · AI 预算` : 'AI 预算'}</span><strong>{budget ? `¥${budget.settledCny.toFixed(3)} / ¥${budget.limitCny}` : '读取中 / 暂不可用'}</strong><p>本项目估算，DeepSeek 账单为准{budget && budget.heldCny > 0 ? `；另占用 ¥${budget.heldCny.toFixed(3)}` : ''}</p></div>
       <div><span>最近正式日报</span><strong>{daily?.reportDate ?? '尚无记录'}</strong><p>{daily ? states[daily.deliveryState ?? daily.state] : '测试邮件不计入正式推送'}</p></div>
     </div>

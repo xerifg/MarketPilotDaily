@@ -217,7 +217,7 @@ export default function App() {
       <span className="storage-pill">{portfolio ? portfolio.storage === 'local' ? '本地开发 · 本机数据' : '个人云端空间' : '正在连接'}</span></header>
       <main><div className="page-heading"><div><span className="eyebrow">{tab === 'positions' ? 'YOUR PORTFOLIO' : tab === 'daily' ? 'DAILY PERSPECTIVE' : 'INVESTMENT PROFILE'}</span>
         <h1>{{ positions: '让每一笔持仓，有据可依。', daily: '每天早上，读懂与你有关的变化。', settings: '先明确自己的投资边界。' }[tab]}</h1>
-        <p>{{ positions: '维护你的真实持仓，让下一份日报更贴近你的投资计划。', daily: '以北京时间 08:30 为目标，通过 163 邮箱接收分析。', settings: '记录可用现金、持有期限和风险偏好，为后续分析提供依据。' }[tab]}</p></div>
+        <p>{{ positions: '维护你的真实持仓，让下一份日报更贴近你的投资计划。', daily: '以北京时间 05:15 为目标，通过 163 邮箱接收分析。', settings: '记录可用现金、持有期限和风险偏好，为后续分析提供依据。' }[tab]}</p></div>
         {tab === 'positions' && <button className="primary" disabled={!portfolio || loading} onClick={() => setEditing('new')}><span aria-hidden="true">＋</span> 添加持仓</button>}</div>
         {error && <div className="error" role="alert">{error} <button className="text-button" onClick={refresh} disabled={loading}>重新加载</button></div>}
         {notice && <div className="notice" role="status">{notice}<button className="text-button" onClick={() => setNotice('')} aria-label="关闭保存提示">×</button></div>}

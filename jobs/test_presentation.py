@@ -8,10 +8,12 @@ from jobs.presentation import beijing, number, reading_lines, report_paragraphs
 from jobs.report import build_report
 
 
-def example_report():
+def example_report(email_summary=None):
     # Synthetic data only. Never store a real portfolio in a test fixture.
     advice = dict(overview='市场涨跌分化，先核对证据。[Q1]', today='建议：先观察。\n依据与反证：信息不足。\n触发条件：补齐行情。\n失效条件：原有判断被新证据推翻。\n复查时间：下一次收盘后。',
                   short='建议：核对持有理由。\n复查时间：每周。', long='建议：复查资产配置。\n复查时间：每季度。', watch='<img src=x onerror=alert(1)>', holdings=[], evidenceIds=['Q1'])
+    if email_summary is not None:
+        advice['emailSummary'] = email_summary
     evidence = dict(quotes=[dict(id='Q1', symbol='000001.SH', close='3000.25', changePct='-1.20', currency='CNY',
                                 amount='123456789', sessionDate='2026-09-11', previousSessionDate='2026-09-10', stale=False)],
                     news=[], coverage=['示例来源：未检出新闻。'], missing=['ETF 申赎尚未覆盖。'],
@@ -39,7 +41,9 @@ class PresentationTests(unittest.TestCase):
         self.assertEqual(''.join(lines), text)
 
     def test_formatted_report_is_readable_and_both_mail_parts_escape_safely(self):
-        report = example_report()
+        report = example_report(dict(conclusion='市场涨跌分化。[Q1]', actions=[],
+                                     events=['<img src=x onerror=alert(1)>'], holdings=[],
+                                     limitations='ETF 申赎尚未覆盖。'))
         self.assertEqual(report['evidence']['analysisStatus'], 'ok')
         plain = '\n'.join(report['paragraphs'])
         self.assertIn('3,000.25 点', plain)
@@ -52,8 +56,8 @@ class PresentationTests(unittest.TestCase):
         self.assertIn('viewport', html)
         self.assertIn('&lt;img', html)
         self.assertNotIn('<img', html)
-        self.assertIn('短期 · 1–4 周', html)
-        self.assertIn('1.23亿 CNY', html)
+        self.assertNotIn('短期 · 1–4 周', html)
+        self.assertNotIn('1.23亿 CNY', html)
         self.assertIn('ETF 申赎尚未覆盖', html)
         self.assertIn('<img', message.get_body(preferencelist=('plain',)).get_content())
 
