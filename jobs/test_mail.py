@@ -6,6 +6,13 @@ from jobs.mail import MailConfig, MailError, build_message, send_report
 
 
 class MailTests(unittest.TestCase):
+    def test_rejects_invalid_or_foreign_share_links(self):
+        from jobs.settings import SETTINGS
+        for url in ['javascript:alert(1)', 'https://other.example/share/' + 'a' * 64,
+                    SETTINGS['app']['origin'] + '/share/guessable', '', 123]:
+            with self.subTest(url=url), self.assertRaisesRegex(MailError, 'invalid_share_url'):
+                build_message(self.config, 'id', 'title', ['text'], [], share_url=url)
+
     def setUp(self):
         self.config = MailConfig("example@163.com", "test-auth-not-real", "example@163.com", "example@163.com")
         self.gateway = Mock()

@@ -2,6 +2,7 @@ import settings from '../config/settings.json';
 import { Fragment, useEffect, useState } from 'react';
 import { api } from './api';
 import { FundFlows } from './FundFlows';
+import { ReportShare } from './ReportShare';
 import { beijing, benchmarks, number, readingLines, safeUrl, sections, type Report, type Source } from './report-format';
 
 interface Run { id: string; reportDate: string; mode: string; version: number; state: string; deliveryState: string | null; createdAt: string; analysisStatus: string | null }
@@ -124,6 +125,6 @@ export function Reports({ paused }: { paused: boolean }) {
     </details>}
     {detailError && <p className="error" role="alert">{detailError}</p>}
     {id && !report && !detailError && <p role="status">正在打开日报…</p>}
-    {report && <ReportBody report={report} />}
+    {report && <><ReportShare key={`${id}-${refreshCount}`} id={id} /><ReportBody report={report} /></>}
   </section>;
 }

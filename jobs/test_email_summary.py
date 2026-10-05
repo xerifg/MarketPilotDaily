@@ -117,6 +117,9 @@ class EmailSummaryTests(unittest.TestCase):
         report = self.report()
         gateway = Mock()
         gateway.post.return_value = dict(id='test-2026-09-13', report=report, delivery=None)
+        from jobs.settings import SETTINGS
+        share_url = SETTINGS['app']['origin'] + '/share/' + 'a' * 64
+        gateway.action.return_value = {'url': share_url}
         gateway.claim.return_value = True
         smtp = Mock()
         for operation in ('ehlo', 'mail', 'rcpt', 'data'):
@@ -134,6 +137,7 @@ class EmailSummaryTests(unittest.TestCase):
         for part in ('plain', 'html'):
             body = message.get_body(preferencelist=(part,)).get_content()
             self.assertIn('今日结论', body)
+            self.assertIn(share_url, body)
             self.assertNotIn('市场收盘概览', body)
             self.assertNotIn('https://example.com/unused', body)
         gateway.finish.assert_called_once_with('test-2026-09-13', 'smtp_accepted', None)

@@ -48,7 +48,7 @@ class MailConfig:
 
 
 def build_message(config: MailConfig, report_id: str, subject: str,
-                  paragraphs: list[str], sources: list[tuple[str, str]], report=None) -> EmailMessage:
+                  paragraphs: list[str], sources: list[tuple[str, str]], report=None, share_url=None) -> EmailMessage:
     """Accept the report's email summary only, never the raw portfolio snapshot.
 
     All text is escaped. Source links are separately validated; model HTML is
@@ -61,9 +61,13 @@ def build_message(config: MailConfig, report_id: str, subject: str,
         raise MailError("invalid_subject")
     if not paragraphs or len(paragraphs) > 100 or any(not isinstance(p, str) for p in paragraphs):
         raise MailError("invalid_mail_summary")
+    report_url = share_url or SETTINGS['app']['origin'] + '/'
+    if share_url is not None and (not isinstance(share_url, str) or not re.fullmatch(
+            re.escape(SETTINGS['app']['origin']) + r'/share/[a-f0-9]{64}', share_url)):
+        raise MailError('invalid_share_url')
     if report:
         paragraphs = [paragraphs[0], *email_paragraphs(report),
-                      '查看完整日报：' + SETTINGS['app']['origin'] + '/']
+                      '查看完整日报：' + report_url]
         sources = email_sources(report)
     if len(sources) > 40:
         raise MailError("too_many_sources")
@@ -95,7 +99,7 @@ def build_message(config: MailConfig, report_id: str, subject: str,
     markup += f'<h1 style="margin:0;font-size:22px;line-height:1.5">{escape(subject)}</h1></td></tr><tr><td style="padding:8px 22px 24px">'
     if report:
         markup += f'<p style="font-size:12px;color:#52665b">{escape(paragraphs[0])}</p>' + email_body(report)
-        markup += f'<p style="margin:24px 0"><a style="display:inline-block;padding:12px 18px;background:#204b3c;color:#fff;text-decoration:none;border-radius:6px" href="{escape(SETTINGS["app"]["origin"] + "/", quote=True)}">查看完整日报</a></p>'
+        markup += f'<p style="margin:24px 0"><a style="display:inline-block;padding:12px 18px;background:#204b3c;color:#fff;text-decoration:none;border-radius:6px" href="{escape(report_url, quote=True)}">查看完整日报</a></p>'
     else:
         markup += "".join(f'<p style="margin:14px 0;line-height:1.85">{escape(p).replace(chr(10), "<br>")}</p>' for p in paragraphs)
     if sources:
@@ -109,8 +113,8 @@ def build_message(config: MailConfig, report_id: str, subject: str,
 
 
 def send_report(config: MailConfig, gateway: DeliveryGateway, report_id: str,
-                subject: str, paragraphs: list[str], sources: list[tuple[str, str]], report=None) -> str:
-    message = build_message(config, report_id, subject, paragraphs, sources, report)
+                subject: str, paragraphs: list[str], sources: list[tuple[str, str]], report=None, share_url=None) -> str:
+    message = build_message(config, report_id, subject, paragraphs, sources, report, share_url)
     payload = message.as_bytes()
     try:
         claimed = gateway.claim(report_id)

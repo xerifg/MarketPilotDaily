@@ -5,14 +5,19 @@ import { lookupInstrument } from './instruments';
 import { getPortfolio, mutatePortfolio } from './portfolio';
 import { reportRoute, taskRoute } from './daily';
 import { getBudget } from './ai-budget';
+import { publicShare, manageShare } from './shares';
 
 interface Env extends AuthEnv { DB: D1Database; ASSETS: Fetcher }
 const revisionCheck = '(SELECT revision FROM portfolio_state WHERE id = 1) = ?';
 
 async function handle(request: Request, env: Env): Promise<Response> {
+  const shared = await publicShare(request, env);
+  if (shared) return shared;
   if (new URL(request.url).pathname.startsWith('/internal/')) return taskRoute(request, env);
   const authResponse = await authRoute(request, env) ?? await authorize(request, env);
   if (authResponse) return authResponse;
+  const shareResponse = await manageShare(request, env);
+  if (shareResponse) return shareResponse;
   const reportResponse = await reportRoute(request, env);
   if (reportResponse) return reportResponse;
   const url = new URL(request.url);
@@ -96,6 +101,7 @@ export default {
     headers.set('X-Content-Type-Options', 'nosniff');
     headers.set('Referrer-Policy', 'no-referrer');
     headers.set('X-Frame-Options', 'DENY');
+    if (new URL(request.url).pathname.startsWith('/share')) headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
     if (!isLocal(request, env)) {
       headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
     }

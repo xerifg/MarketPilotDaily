@@ -42,6 +42,20 @@ async function post(path: string, value: unknown, jwt = '') {
 }
 const report = () => ({ title: '测试', paragraphs: ['测试正文'], sources: [], evidence: {}, model: 'test', estimatedCostCny: '0', cutoffAt: new Date().toISOString() });
 
+test('sender creates stable per-report links but never reopens revoked shares', async () => {
+  const jwt = await token();
+  const run = await (await post('runs/claim', { mode: 'test' }, jwt)).json() as { id: string };
+  assert.equal((await post(`runs/${run.id}/share-link`, {}, jwt)).status, 409);
+  assert.equal((await post(`runs/${run.id}/report`, report(), jwt)).status, 200);
+  const link = await (await post(`runs/${run.id}/share-link`, {}, jwt)).json() as { url: string };
+  assert.match(link.url, /\/share\/[a-f0-9]{64}$/);
+  assert.deepEqual(await (await post(`runs/${run.id}/share-link`, {}, jwt)).json(), link);
+  assert.equal((await mf.dispatchFetch(link.url)).status, 200);
+  await db.prepare('UPDATE report_shares SET revoked = 1 WHERE report_id = ?').bind(run.id).run();
+  assert.deepEqual(await (await post(`runs/${run.id}/share-link`, {}, jwt)).json(), { url: null });
+  assert.equal((await mf.dispatchFetch(link.url)).status, 404);
+});
+
 test('OIDC requires valid signature, audience, expiry, exact repository and trusted workflow', async () => {
   assert.equal((await post('runs/claim', { mode: 'test' })).status, 401);
   for (const extra of [{ repository_id: '999' }, { ref: 'refs/heads/other' }, { event_name: 'pull_request' },

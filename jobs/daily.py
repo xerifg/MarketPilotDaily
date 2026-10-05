@@ -62,7 +62,9 @@ def main():
         late = mode == "daily" and (now.hour, now.minute) > (5, 25)
         title = (f"[测试·第{version}版] " if mode == "test" else "[延迟] " if late else "") + now.strftime("%Y-%m-%d ") + report["title"]
         paragraphs = [("这是一封联调测试日报。" if mode == "test" else "每日投资观察。") + f" 发送于 {now.strftime('%Y-%m-%d %H:%M')}（北京时间）。"]
-        state = send_report(config, gateway, run["id"], title, paragraphs, [], report=report)
+        stage = 'share_link'
+        share_url = gateway.action('share-link')['url']
+        state = send_report(config, gateway, run["id"], title, paragraphs, [], report=report, share_url=share_url)
         print("status=" + state)
         return 0 if state == "smtp_accepted" else 1
     except MailError as error:

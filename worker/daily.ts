@@ -3,6 +3,7 @@ import { HttpError, type AuthEnv } from './auth';
 import { authorizeTask } from './task-auth';
 import { getPortfolio } from './portfolio';
 import { reserveAiCall, settleAiCall, markAiCallUncertain } from './ai-budget';
+import { shareLink } from './shares';
 
 const idSchema = z.string().regex(/^(daily|test)-\d{4}-\d{2}-\d{2}(?:-v[23])?$/);
 const text = z.string().max(6000);
@@ -60,9 +61,13 @@ export async function taskRoute(request: Request, env: AuthEnv): Promise<Respons
     return Response.json({ id, state: run.state, owned: run.github_run_id === githubRunId, snapshot: JSON.parse(run.snapshot_json),
       createdAt: run.created_at, report: report ? JSON.parse(report.result_json) : null, delivery });
   }
-  const match = /^\/internal\/runs\/([^/]+)\/(ai-reserve|ai-settle|ai-uncertain|report|failed|delivery-claim|delivery-finish)$/.exec(path);
+  const match = /^\/internal\/runs\/([^/]+)\/(ai-reserve|ai-settle|ai-uncertain|report|failed|delivery-claim|delivery-finish|share-link)$/.exec(path);
   if (!match) throw new HttpError(404, '任务接口不存在。');
   const id = idSchema.parse(match[1]); const action = match[2]; const run = await getRun(env.DB, id);
+  if (action === 'share-link') {
+    if (run.state !== 'ready') throw new HttpError(409, '报告尚未生成。');
+    return Response.json(await shareLink(env.DB, id, env.APP_ORIGIN!, true));
+  }
   if (!action.startsWith('delivery-') && (run.github_run_id !== githubRunId || run.state !== 'collecting')) throw new HttpError(409, '任务已领取或已完成。');
   const aiId = `${id}-ai`;
   if (action === 'ai-reserve') return Response.json({ allowed: await reserveAiCall(env.DB, aiId) });
