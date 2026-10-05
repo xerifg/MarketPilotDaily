@@ -78,21 +78,21 @@ def report_sections(report):
                           + (' · 数据偏旧，不能作为今日触发依据' if quote.get('stale') else ''))
     sections.append(('市场收盘概览', market or ['本期无可用行情。']))
     sections.extend(full_flow_sections(evidence.get('fundFlows')))
-    sections.append(('过去 24 小时 · 新闻线索', [f"{item['title']} [{item['id']}]\n{beijing(item['publishedAt'])}（北京时间）"
+    sections.append((f"过去 {evidence.get('newsLookbackHours', 24)} 小时 · 新闻线索", [f"{item['title']} [{item['id']}]\n{beijing(item['publishedAt'])}（北京时间）"
                     for item in evidence.get('news', [])] or ['本期未检出符合时间窗口的相关新闻；不代表没有市场事件。']))
     sections.append(('数据覆盖与限制', evidence.get('coverage', []) + evidence.get('missing', [])))
     return sections
 
 
 def report_paragraphs(report):
-    return [f"信息截止 {beijing(report['cutoffAt'])}（北京时间）｜新闻窗口：此前 24 小时｜行情：最近可取得收盘价",
+    return [f"信息截止 {beijing(report['cutoffAt'])}（北京时间）｜新闻窗口：此前 {report.get('evidence', {}).get('newsLookbackHours', 24)} 小时｜行情：最近可取得收盘价",
             RISK_NOTE,
             *[title + '\n' + '\n\n'.join(lines) for title, lines in report_sections(report)],
             '使用说明：先核实数据，再决定操作；本日报不自动交易。仓位按同币种计算，人民币与美元没有直接相加。']
 
 
 def email_paragraphs(report):
-    return [f"信息截止 {beijing(report['cutoffAt'])}（北京时间）｜新闻窗口：此前 24 小时｜行情：最近可取得收盘价",
+    return [f"信息截止 {beijing(report['cutoffAt'])}（北京时间）｜新闻窗口：此前 {report.get('evidence', {}).get('newsLookbackHours', 24)} 小时｜行情：最近可取得收盘价",
             *[title + '\n' + '\n\n'.join(lines) for title, lines in email_sections(report)]]
 
 

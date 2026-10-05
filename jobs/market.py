@@ -11,15 +11,14 @@ from urllib.request import Request, urlopen
 import xml.etree.ElementTree as ET
 from zoneinfo import ZoneInfo
 from jobs.fund_flows import collect_flows, flow_sources
+from jobs.settings import SETTINGS
 
-BENCHMARKS = {"000001.SH": "上证指数", "399001.SZ": "深证成指", "SPY.US": "SPY（标普500 ETF）", "QQQ.US": "QQQ（纳斯达克100 ETF）"}
-FEEDS = [("中新网财经", "https://www.chinanews.com.cn/rss/finance.xml"),
-         ("MarketWatch", "https://feeds.content.dowjones.io/public/rss/mw_topstories"),
-         ("美联储", "https://www.federalreserve.gov/feeds/press_all.xml")]
+BENCHMARKS = SETTINGS["watchlist"]["benchmarks"]
+FEEDS = SETTINGS["news"]["feeds"]
 
 
 def fetch(url):
-    with urlopen(Request(url, headers={"User-Agent": "MarketPilotDaily/0.1 (personal research)"}), timeout=20) as response:
+    with urlopen(Request(url, headers={"User-Agent": "MarketPilotDaily/0.1 (personal research)"}), timeout=SETTINGS["requests"]["marketTimeoutSeconds"]) as response:
         raw = response.read(2000001)
         if len(raw) > 2000000:
             raise ValueError("source_too_large")
@@ -60,12 +59,12 @@ def parse_bars(symbol, data, cutoff):
     return {"symbol": symbol, "sessionDate": str(current[0]), "previousSessionDate": str(previous[0]),
             "close": str(current[1]), "changePct": percent((current[1] / previous[1] - 1) * 100),
             "amount": str(current[3]) if current[3] > 0 else None,
-            "stale": age > 4, "ageDays": age, "adjustment": "none",
+            "stale": age > SETTINGS["collection"]["staleAfterDays"], "ageDays": age, "adjustment": "none",
             "currency": "USD" if symbol.endswith(".US") else "CNY"}
 
 
 def read_quote(symbol, cutoff):
-    url = "https://free-api.tickflow.org/v1/klines?" + urlencode({"symbol": symbol, "period": "1d", "count": 8, "adjust": "none"})
+    url = SETTINGS["sources"]["tickflow"]["klinesUrl"] + "?" + urlencode({"symbol": symbol, "period": "1d", "count": SETTINGS["collection"]["dailyBarCount"], "adjust": "none"})
     try:
         result = parse_bars(symbol, json.loads(fetch(url), parse_float=Decimal)["data"], cutoff)
         return {**result, "sourceUrl": url}
@@ -80,7 +79,7 @@ def parse_feed(raw, cutoff):
     for item in ET.fromstring(raw).findall("./channel/item"):
         try:
             stamp = parsedate_to_datetime(item.findtext("pubDate", ""))
-            if stamp.tzinfo is None or not cutoff - timedelta(hours=24) <= stamp <= cutoff:
+            if stamp.tzinfo is None or not cutoff - timedelta(hours=SETTINGS["news"]["lookbackHours"]) <= stamp <= cutoff:
                 continue
             url = item.findtext("link", "").strip()
             parsed = urlsplit(url)
@@ -96,27 +95,29 @@ def parse_feed(raw, cutoff):
 
 def news_relevance(title, positions):
     keywords = [p["name"] for p in positions] + [p["symbol"].removesuffix('.US') for p in positions if p["symbol"].endswith('.US')]
-    keywords += ["股", "金融", "政策", "经济", "金属", "铜", "铝", "黄金", "能源", "market", "stock", "inflation", "Fed",
-                 "AI", "rate", "tariff", "bond", "economy", "oil", "metal", "bank", "regulation"]
+    keywords += SETTINGS["news"]["keywords"]
     return sum(bool(re.search(r'\b' + re.escape(word) + r'\b', title, re.I)) if word.isascii()
                else word in title for word in keywords)
 
 
 def collect(snapshot, cutoff):
     positions = snapshot["positions"]
-    symbols = list(dict.fromkeys([*BENCHMARKS, *(p["symbol"] for p in positions[:20])]))
-    with ThreadPoolExecutor(max_workers=3) as pool:
+    symbols = list(dict.fromkeys([*BENCHMARKS, *(p["symbol"] for p in positions[:SETTINGS["collection"]["maxPositions"]])]))
+    with ThreadPoolExecutor(max_workers=SETTINGS["collection"]["concurrency"]) as pool:
         quotes = list(pool.map(lambda symbol: read_quote(symbol, cutoff), symbols))
     news, coverage = [], []
-    for publisher, url in FEEDS:
+    for feed in FEEDS:
+        if not feed["enabled"]:
+            continue
+        publisher, url = feed["name"], feed["url"]
         try:
             items = parse_feed(fetch(url), cutoff)
             # Prefer relevant company names, then market and policy topics, then recency.
-            relevant = [item for item in items if publisher == '美联储' or news_relevance(item['title'], positions) > 0]
+            relevant = [item for item in items if not feed["filterByKeywords"] or news_relevance(item['title'], positions) > 0]
             relevant.sort(key=lambda item: -news_relevance(item['title'], positions))
-            limit = 5 if publisher != "美联储" else 2
+            limit = feed["maxItems"]
             news.extend({**item, "publisher": publisher} for item in relevant[:limit])
-            coverage.append(f"{publisher}：过去24小时检出{len(items)}条，选入{min(limit, len(relevant))}条；仅依据RSS摘要。")
+            coverage.append(f"{publisher}：过去{SETTINGS['news']['lookbackHours']}小时检出{len(items)}条，选入{min(limit, len(relevant))}条；仅依据RSS摘要。")
         except Exception:
             coverage.append(f"{publisher}：本次获取失败，不代表没有新闻。")
     flows = collect_flows(positions, cutoff)
@@ -127,8 +128,8 @@ def collect(snapshot, cutoff):
                "涨跌为不复权收盘价变化，除权除息可能影响；不代表含分红总回报。"]
     if not positions:
         missing.append("尚未填写真实持仓，本次只能提供市场观察，不能作个人买卖或仓位建议。")
-    if len(positions) > 20:
-        missing.append("首版最多采集20只持仓的行情，其余未覆盖；不计算全账户仓位。")
+    if len(positions) > SETTINGS["collection"]["maxPositions"]:
+        missing.append(f"首版最多采集{SETTINGS['collection']['maxPositions']}只持仓的行情，其余未覆盖；不计算全账户仓位。")
     sources = []
     for quote in quotes:
         quote["id"] = f"Q{len(sources)+1}"
@@ -140,7 +141,7 @@ def collect(snapshot, cutoff):
     sources.extend(flow_sources(flows))
     missing.extend(flows['limitations'])
     coverage.append(f"资金数据：行业 {len(flows['industry']['rows'])} 项，沪市ETF观察池 {len(flows['etf']['rows'])} 项，关联持仓 {len(flows['holdings'])} 项。")
-    return {"quotes": quotes, "news": news, "coverage": coverage, "missing": missing, "sources": sources, "fundFlows": flows}
+    return {"newsLookbackHours": SETTINGS["news"]["lookbackHours"], "quotes": quotes, "news": news, "coverage": coverage, "missing": missing, "sources": sources, "fundFlows": flows}
 
 
 def portfolio_metrics(snapshot, quotes):

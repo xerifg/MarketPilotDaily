@@ -1,4 +1,6 @@
-import settings from '../config/ai.json';
+import config from '../config/settings.json';
+
+const settings = config.ai;
 
 const monthlyLimit = Math.round(Number(settings.monthlyBudgetCny) * 1_000_000);
 const reservation = Math.round(Number(settings.reservePerCallCny) * 1_000_000);

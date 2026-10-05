@@ -1,3 +1,4 @@
+import settings from '../config/settings.json';
 import { Fragment, useEffect, useState } from 'react';
 import { api } from './api';
 import { FundFlows } from './FundFlows';
@@ -22,7 +23,7 @@ function ReportBody({ report }: { report: Report }) {
   const names = Object.fromEntries((evidence?.metrics ?? []).map(m => [m.symbol, m.name]));
   return <article className="report-content">
     <header className="report-masthead"><span className="eyebrow">MARKETPILOT / DAILY BRIEF</span><h2>{report.title}</h2>
-      <p>信息截止 {beijing(report.cutoffAt)}（北京时间）</p><p>新闻窗口：此前 24 小时 · 行情：最近可取得收盘价</p></header>
+      <p>信息截止 {beijing(report.cutoffAt)}（北京时间）</p><p>新闻窗口：此前 {evidence?.newsLookbackHours ?? 24} 小时 · 行情：最近可取得收盘价</p></header>
     {advice && <>
       {evidence?.presentationVersion !== 2 && <p className="report-note">历史分析原文，仅调整排版；其中条件与阈值未按新版规则重新生成，请核对后使用。</p>}
       <section className="report-summary"><h3>先看重点</h3><Text text={advice.overview} sources={report.sources} /></section>
@@ -51,7 +52,7 @@ function ReportBody({ report }: { report: Report }) {
             {quote.stale && <p className="quote-stale">数据偏旧，不能作为今日触发依据</p>}</>}
         </div>)}</div></section>
       {evidence.fundFlows && <FundFlows flows={evidence.fundFlows} />}
-      <section className="report-section" id="report-news"><h3>过去 24 小时 · 新闻线索</h3><p className="report-note">依据 RSS 标题与摘要，尚未核验全文。英文标题保留原文。</p>
+      <section className="report-section" id="report-news"><h3>过去 {evidence?.newsLookbackHours ?? 24} 小时 · 新闻线索</h3><p className="report-note">依据 RSS 标题与摘要，尚未核验全文。英文标题保留原文。</p>
         {evidence.news?.length ? <ol className="report-news">{evidence.news.map(item => <li key={item.id}><a href={safeUrl(item.url)} target="_blank" rel="noopener noreferrer">{item.title}</a><small>{beijing(item.publishedAt)} · 北京时间 · [{item.id}]</small></li>)}</ol> : <p>本期未检出符合时间窗口的相关新闻，不代表没有市场事件。</p>}
       </section>
       <section className="report-section report-limits"><h3>数据缺口 · 判断前须核实</h3><ul>{evidence.missing?.map((item, i) => <li key={i}>{item}</li>)}</ul>
@@ -108,7 +109,7 @@ export function Reports({ paused }: { paused: boolean }) {
     </div>
     {budget && !budget.canAnalyze && <p className="report-note">可用预算不足以预留下一次分析费用，将暂停付费分析；已启用的每日任务仍可发送基础行情与新闻。</p>}
     {budget && budget.uncertainCalls > 0 && <p className="report-note">有 {budget.uncertainCalls} 次调用结果不确定，费用预留仍保留，避免超支。</p>}
-    {missingDaily && <p className="report-note">截至本次刷新，今天尚无正式邮件被 163 接受的记录。若今天应开始推送，请<a href="https://github.com/xerifg/MarketPilotDaily/actions/workflows/daily.yml" target="_blank" rel="noopener noreferrer">检查定时任务</a>。</p>}
+    {missingDaily && <p className="report-note">截至本次刷新，今天尚无正式邮件被 163 接受的记录。若今天应开始推送，请<a href={settings.app.taskUrl} target="_blank" rel="noopener noreferrer">检查定时任务</a>。</p>}
     <div className="list-toolbar"><h2>日报阅读</h2><button className="secondary" disabled={loading} onClick={refresh}>刷新记录</button></div>
     {error && <p className="error" role="alert">{error}</p>}
     {loading && <p role="status">正在读取记录…</p>}

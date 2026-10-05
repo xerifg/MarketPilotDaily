@@ -3,13 +3,13 @@
 from dataclasses import dataclass, field
 from decimal import Decimal
 import json
-from pathlib import Path
 from typing import Protocol
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
+from jobs.settings import SETTINGS as CONFIG
 
-SETTINGS = json.loads((Path(__file__).resolve().parents[1] / "config" / "ai.json").read_text(encoding="utf-8"))
-ENDPOINT = "https://api.deepseek.com/chat/completions"
+SETTINGS = CONFIG["ai"]
+ENDPOINT = SETTINGS["endpoint"]
 
 
 class BudgetGateway(Protocol):
@@ -34,7 +34,7 @@ def request_json(payload: bytes, api_key: str) -> dict:
         "Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
     }, method="POST")
     try:
-        with build_opener(NoRedirects()).open(request, timeout=120) as response:
+        with build_opener(NoRedirects()).open(request, timeout=SETTINGS["timeoutSeconds"]) as response:
             raw = response.read(2_000_001)
             if len(raw) > 2_000_000:
                 raise DeepSeekError("response_too_large")

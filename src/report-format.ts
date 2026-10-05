@@ -1,3 +1,5 @@
+import settings from '../config/settings.json';
+
 export interface Source { id: string; title: string; url: string; publishedAt: string }
 export interface Quote { id: string; symbol: string; missing?: boolean; close: string; changePct: string; currency: string;
   sessionDate: string; previousSessionDate: string; amount: string | null; stale: boolean }
@@ -11,10 +13,9 @@ export interface FundFlows { industry: FlowGroup; etf: FlowGroup; fetchedAt: str
   holdings: { symbol: string; name: string; kind: string; flow: FlowRow | null; industryCode: string | null; note: string }[] }
 export interface Report { title: string; paragraphs: string[]; cutoffAt: string; model: string; estimatedCostCny: string; sources: Source[];
   evidence?: { presentationVersion?: number; analysisStatus?: string; analysisRaw?: Analysis | null;
-    quotes?: Quote[]; news?: Source[]; coverage?: string[]; missing?: string[]; fundFlows?: FundFlows;
+    newsLookbackHours?: number; quotes?: Quote[]; news?: Source[]; coverage?: string[]; missing?: string[]; fundFlows?: FundFlows;
     metrics?: { symbol: string; name: string; currency: string; weightPct: string | null; pnlPct: string | null }[] } }
-export const benchmarks: Record<string, string> = { '000001.SH': '上证指数', '399001.SZ': '深证成指',
-  'SPY.US': 'SPY · 标普 500 ETF', 'QQQ.US': 'QQQ · 纳斯达克 100 ETF' };
+export const benchmarks: Record<string, string> = { ...settings.watchlist.benchmarks, ...settings.watchlist.benchmarkDisplayNames };
 export const sections = [['today', '今日', '行动计划'], ['short', '短期', '1–4 周'], ['long', '长期', '6–24 个月']] as const;
 export function beijing(value: string) {
   const date = new Date(value);

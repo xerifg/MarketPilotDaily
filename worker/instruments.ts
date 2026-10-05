@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import settings from '../config/settings.json';
 import type { Instrument } from '../shared/schema';
 import { HttpError } from './auth';
 import { usAssetType } from './us-directory';
@@ -11,8 +12,8 @@ const responseSchema = z.object({ data: z.array(z.object({
 export async function lookupInstrument(symbol: string): Promise<Instrument> {
   let raw: unknown;
   try {
-    const response = await fetch(`https://free-api.tickflow.org/v1/instruments?symbols=${encodeURIComponent(symbol)}`, {
-      signal: AbortSignal.timeout(10000),
+    const response = await fetch(`${settings.sources.tickflow.instrumentsUrl}?symbols=${encodeURIComponent(symbol)}`, {
+      signal: AbortSignal.timeout(settings.requests.instrumentTimeoutMs),
     });
     if (!response.ok) throw new Error('Upstream failed');
     raw = await response.json();

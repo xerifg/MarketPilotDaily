@@ -7,15 +7,15 @@ import re
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
+from jobs.settings import SETTINGS
 
 CN = ZoneInfo('Asia/Shanghai')
-INDUSTRY_URL = 'https://data.eastmoney.com/bkzj/hy.html'
-SHARES_URL = 'https://query.sse.com.cn/commonQuery.do'
-NAV_URL = 'https://api.fund.eastmoney.com/f10/lsjz'
+SOURCES = SETTINGS['sources']
+INDUSTRY_URL = SOURCES['eastmoney']['industryUrl']
+SHARES_URL = SOURCES['sse']['sharesUrl']
+NAV_URL = SOURCES['fund']['navUrl']
 # A representative observation basket, never presented as the entire ETF market.
-ETF_BASKET = {'510300': '沪深300', '510500': '中证500', '588000': '科创50',
-              '512480': '半导体', '512660': '军工', '512010': '医药',
-              '515790': '光伏', '518880': '黄金', '511010': '国债'}
+ETF_BASKET = SETTINGS['watchlist']['etfs']
 INDUSTRY_NOTE = '东方财富行业榜口径：主力净流入为大单与超大单交易统计，不代表全市场新增资金；行业与个股不可相加。'
 ETF_NOTE = '沪市代表ETF及已持有的沪市ETF，非全市场排名。估算净申赎＝份额变化×前一交易日单位净值；实物申赎不等于现金进出。'
 
@@ -25,7 +25,7 @@ def fetch_json(url, params=None, referer=None):
     if referer:
         headers['Referer'] = referer
     target = url + ('?' + urlencode(params) if params else '')
-    with urlopen(Request(target, headers=headers), timeout=15) as response:
+    with urlopen(Request(target, headers=headers), timeout=SETTINGS['requests']['flowTimeoutSeconds']) as response:
         raw = response.read(2_000_001)
         if len(raw) > 2_000_000:
             raise ValueError('flow_source_too_large')
@@ -46,7 +46,7 @@ def closed_day(value, cutoff):
 
 
 def stale(value, cutoff):
-    return (cutoff.astimezone(CN).date() - date.fromisoformat(value)).days > 4
+    return (cutoff.astimezone(CN).date() - date.fromisoformat(value)).days > SETTINGS['collection']['staleAfterDays']
 
 
 def parse_industries(raw, cutoff):
@@ -69,7 +69,7 @@ def parse_industries(raw, cutoff):
         except (ValueError, InvalidOperation):
             net5 = None
         rows.append(dict(code=code, name=name, date=day, net=net, net5=net5, stale=stale(day, cutoff),
-                         sourceIds=['F1'], sourceUrl=f'https://data.eastmoney.com/bkzj/{code}.html'))
+                         sourceIds=['F1'], sourceUrl=SOURCES['eastmoney']['industryDetailUrl'].format(code=code)))
     # Never compare rankings from different sessions.
     latest = max((row['date'] for row in rows), default=None)
     return sorted([row for row in rows if row['date'] == latest], key=lambda row: decimal(row['net']), reverse=True)
@@ -78,7 +78,7 @@ def parse_industries(raw, cutoff):
 def read_industries(cutoff):
     raw, total = [], None
     for page in range(1, 7):
-        data = fetch_json('https://push2.eastmoney.com/api/qt/clist/get', dict(
+        data = fetch_json(SOURCES['eastmoney']['industryApiUrl'], dict(
             pn=page, pz=100, po=1, np=1, fltt=2, invt=2, fid='f62', fs='m:90 s:4',
             fields='f12,f14,f62,f164,f124'), INDUSTRY_URL)['data']
         if total is not None and total != data['total']:
@@ -97,7 +97,7 @@ def read_industries(cutoff):
 def read_nav(code, cutoff):
     result = fetch_json(NAV_URL, dict(fundCode=code, pageIndex=1, pageSize=12,
                                     startDate='', endDate=cutoff.astimezone(CN).date().isoformat()),
-                        'https://fund.eastmoney.com/')
+                        SOURCES['fund']['referer'])
     if result.get('ErrCode') != 0:
         raise ValueError('nav_unavailable')
     rows = {}
@@ -115,7 +115,7 @@ def read_nav(code, cutoff):
 def read_shares(day):
     result = fetch_json(SHARES_URL, {'sqlId': 'COMMON_SSE_ZQPZ_ETFZL_XXPL_ETFGM_SEARCH_L',
                                     'STAT_DATE': day, 'isPagination': 'true',
-                                    'pageHelp.pageSize': 10000, 'pageHelp.pageNo': 1}, 'https://www.sse.com.cn/')
+                                    'pageHelp.pageSize': 10000, 'pageHelp.pageNo': 1}, SOURCES['sse']['referer'])
     raw = result['result']
     if len(raw) != int(result['pageHelp']['total']):
         raise ValueError('incomplete_etf_shares')
@@ -152,7 +152,7 @@ def estimate_etf(code, days, shares, navs, cutoff):
                 net5=str(sum(values[:5]).quantize(Decimal('.01'))) if len(values) >= 5 and all(v is not None for v in values[:5]) else None,
                 shareChange=str(shares[current][code]['shares'] - shares[previous][code]['shares']),
                 navDate=previous, stale=stale(current, cutoff), sourceIds=['F2', 'F3'],
-                sourceUrl=f'https://fund.eastmoney.com/{code}.html')
+                sourceUrl=SOURCES['fund']['detailUrl'].format(code=code))
 
 
 def attempt(function, *args):
@@ -163,12 +163,12 @@ def attempt(function, *args):
 
 
 def read_etfs(positions, cutoff):
-    codes = list(dict.fromkeys([*ETF_BASKET, *(p['symbol'].split('.')[0] for p in positions[:20]
+    codes = list(dict.fromkeys([*ETF_BASKET, *(p['symbol'].split('.')[0] for p in positions[:SETTINGS['collection']['maxPositions']]
                         if p.get('assetType') == 'etf' and p['symbol'].endswith('.SH'))]))
-    with ThreadPoolExecutor(max_workers=3) as pool:
+    with ThreadPoolExecutor(max_workers=SETTINGS['collection']['concurrency']) as pool:
         navs = dict(zip(codes, pool.map(lambda code: attempt(read_nav, code, cutoff), codes)))
-    days = sorted(navs.get('510300') or {}, reverse=True)[:6]
-    with ThreadPoolExecutor(max_workers=3) as pool:
+    days = sorted(navs.get(SETTINGS['watchlist']['etfReferenceCode']) or {}, reverse=True)[:6]
+    with ThreadPoolExecutor(max_workers=SETTINGS['collection']['concurrency']) as pool:
         shares = dict(zip(days, pool.map(lambda day: attempt(read_shares, day) or {}, days)))
     rows = []
     for code in codes:
@@ -184,8 +184,8 @@ def read_stock(position, cutoff):
     symbol = position['symbol']
     code, exchange = symbol.split('.')
     secid = ('1.' if exchange == 'SH' else '0.') + code
-    data = fetch_json('https://push2.eastmoney.com/api/qt/ulist.np/get', dict(
-        secids=secid, fltt=2, fields='f12,f14,f62,f164,f124'), 'https://data.eastmoney.com/')['data']['diff']
+    data = fetch_json(SOURCES['eastmoney']['stockFlowApiUrl'], dict(
+        secids=secid, fltt=2, fields='f12,f14,f62,f164,f124'), SOURCES['eastmoney']['referer'])['data']['diff']
     if len(data) != 1 or data[0]['f12'] != code:
         raise ValueError('stock_flow_mismatch')
     item = data[0]
@@ -198,10 +198,10 @@ def read_stock(position, cutoff):
         net5 = str(decimal(item.get('f164')))
     except (ValueError, InvalidOperation):
         net5 = None
-    info = attempt(fetch_json, 'https://push2.eastmoney.com/api/qt/stock/get', dict(secid=secid, fields='f57,f127'))
+    info = attempt(fetch_json, SOURCES['eastmoney']['stockInfoApiUrl'], dict(secid=secid, fields='f57,f127'))
     industry = (info or {}).get('data') or {}
     row = dict(code=code, name=position['name'], date=day, net=net, net5=net5,
-               stale=stale(day, cutoff), sourceIds=['F4'], sourceUrl=f'https://data.eastmoney.com/zjlx/{code}.html')
+               stale=stale(day, cutoff), sourceIds=['F4'], sourceUrl=SOURCES['eastmoney']['stockDetailUrl'].format(code=code))
     return row, industry.get('f127') if industry.get('f57') == code else None
 
 
@@ -229,16 +229,16 @@ def collect_flows(positions, cutoff):
         else:
             row['note'] = '证券类型或市场未覆盖，暂不推断资金方向。'
         return row
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        holdings = list(pool.map(holding, positions[:20]))
+    with ThreadPoolExecutor(max_workers=SETTINGS['collection']['concurrency']) as pool:
+        holdings = list(pool.map(holding, positions[:SETTINGS['collection']['maxPositions']]))
     limitations = ['首版资金模块覆盖A股行业、沪市ETF观察池和沪深股票持仓；美股、深市ETF净申赎暂未覆盖。']
     for label, group in [('行业', industries), ('ETF', etfs)]:
         if group['status'] != 'ok':
             limitations.append(f"{label}资金数据覆盖 {len(group['rows'])}/{group['expectedCount']} 项；缺失不代表零流入，排名仅针对已取得的数据。")
         if any(row['stale'] for row in group['rows']):
             limitations.append(f'{label}资金数据偏旧，仅供历史参考。')
-    if len(positions) > 20:
-        limitations.append('持仓关联仅覆盖前20只证券。')
+    if len(positions) > SETTINGS['collection']['maxPositions']:
+        limitations.append(f"持仓关联仅覆盖前{SETTINGS['collection']['maxPositions']}只证券。")
     return dict(industry=industries, etf=etfs, holdings=holdings, limitations=limitations, fetchedAt=cutoff.isoformat())
 
 
@@ -246,5 +246,5 @@ def flow_sources(flows):
     stamp = flows['fetchedAt']
     return [dict(id='F1', title='东方财富行业主力资金统计', url=INDUSTRY_URL, publishedAt=flows['industry']['date'] or stamp),
             dict(id='F2', title='上交所ETF份额（万份）', url=SHARES_URL + '?sqlId=COMMON_SSE_ZQPZ_ETFZL_XXPL_ETFGM_SEARCH_L', publishedAt=flows['etf']['date'] or stamp),
-            dict(id='F3', title='天天基金单位净值（各ETF详情见资金表）', url='https://fund.eastmoney.com/jzzzl.html', publishedAt=flows['etf']['date'] or stamp),
-            dict(id='F4', title='东方财富个股主力资金统计', url='https://data.eastmoney.com/zjlx/list.html', publishedAt=stamp)]
+            dict(id='F3', title='天天基金单位净值（各ETF详情见资金表）', url=SOURCES['fund']['sourceUrl'], publishedAt=flows['etf']['date'] or stamp),
+            dict(id='F4', title='东方财富个股主力资金统计', url=SOURCES['eastmoney']['stockSourceUrl'], publishedAt=stamp)]

@@ -6,8 +6,9 @@ from urllib.parse import urlencode, urlsplit
 from urllib.error import HTTPError
 from urllib.request import Request, build_opener
 from jobs.deepseek import NoRedirects
+from jobs.settings import SETTINGS
 
-ORIGIN = "https://market-pilot-daily.market-pilot-daily.workers.dev"
+ORIGIN = SETTINGS["app"]["origin"]
 
 
 class GatewayError(Exception):
@@ -30,7 +31,7 @@ class Gateway:
         request = Request(url + ("&" if "?" in url else "?") + urlencode({"audience": ORIGIN}),
                           headers={"Authorization": "Bearer " + os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"]})
         try:
-            with build_opener(NoRedirects()).open(request, timeout=25) as response:
+            with build_opener(NoRedirects()).open(request, timeout=SETTINGS["requests"]["tokenTimeoutSeconds"]) as response:
                 self.token = json.loads(response.read(32000))["value"]
         except HTTPError as error:
             raise GatewayError(f"oidc_http_{error.code}") from None
@@ -43,7 +44,7 @@ class Gateway:
         try:
             request = Request(ORIGIN + "/internal/" + path, data=json.dumps(body, ensure_ascii=False).encode(),
                               headers={"Authorization": "Bearer " + self._token(), "Content-Type": "application/json", "User-Agent": "MarketPilotDaily/0.1"})
-            with build_opener(NoRedirects()).open(request, timeout=30) as response:
+            with build_opener(NoRedirects()).open(request, timeout=SETTINGS["requests"]["gatewayTimeoutSeconds"]) as response:
                 raw = response.read(250001)
                 if len(raw) > 250000:
                     raise GatewayError("response_too_large")

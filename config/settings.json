@@ -1,0 +1,143 @@
+{
+  "app": {
+    "origin": "https://market-pilot-daily.market-pilot-daily.workers.dev",
+    "taskUrl": "https://github.com/xerifg/MarketPilotDaily/actions/workflows/daily.yml"
+  },
+  "news": {
+    "lookbackHours": 24,
+    "keywords": [
+      "股",
+      "金融",
+      "政策",
+      "经济",
+      "金属",
+      "铜",
+      "铝",
+      "黄金",
+      "能源",
+      "market",
+      "stock",
+      "inflation",
+      "Fed",
+      "AI",
+      "rate",
+      "tariff",
+      "bond",
+      "economy",
+      "oil",
+      "metal",
+      "bank",
+      "regulation"
+    ],
+    "feeds": [
+      {
+        "name": "中新网财经",
+        "url": "https://www.chinanews.com.cn/rss/finance.xml",
+        "enabled": true,
+        "maxItems": 5,
+        "filterByKeywords": true
+      },
+      {
+        "name": "MarketWatch",
+        "url": "https://feeds.content.dowjones.io/public/rss/mw_topstories",
+        "enabled": true,
+        "maxItems": 5,
+        "filterByKeywords": true
+      },
+      {
+        "name": "美联储",
+        "url": "https://www.federalreserve.gov/feeds/press_all.xml",
+        "enabled": true,
+        "maxItems": 2,
+        "filterByKeywords": false
+      }
+    ]
+  },
+  "sources": {
+    "tickflow": {
+      "klinesUrl": "https://free-api.tickflow.org/v1/klines",
+      "instrumentsUrl": "https://free-api.tickflow.org/v1/instruments"
+    },
+    "nasdaq": {
+      "directoryUrl": "https://www.nasdaqtrader.com/dynamic/SymDir/"
+    },
+    "eastmoney": {
+      "industryUrl": "https://data.eastmoney.com/bkzj/hy.html",
+      "industryApiUrl": "https://push2.eastmoney.com/api/qt/clist/get",
+      "stockFlowApiUrl": "https://push2.eastmoney.com/api/qt/ulist.np/get",
+      "stockInfoApiUrl": "https://push2.eastmoney.com/api/qt/stock/get",
+      "referer": "https://data.eastmoney.com/",
+      "industryDetailUrl": "https://data.eastmoney.com/bkzj/{code}.html",
+      "stockDetailUrl": "https://data.eastmoney.com/zjlx/{code}.html",
+      "stockSourceUrl": "https://data.eastmoney.com/zjlx/list.html"
+    },
+    "sse": {
+      "sharesUrl": "https://query.sse.com.cn/commonQuery.do",
+      "referer": "https://www.sse.com.cn/"
+    },
+    "fund": {
+      "navUrl": "https://api.fund.eastmoney.com/f10/lsjz",
+      "referer": "https://fund.eastmoney.com/",
+      "detailUrl": "https://fund.eastmoney.com/{code}.html",
+      "sourceUrl": "https://fund.eastmoney.com/jzzzl.html"
+    }
+  },
+  "watchlist": {
+    "benchmarks": {
+      "000001.SH": "上证指数",
+      "399001.SZ": "深证成指",
+      "SPY.US": "SPY（标普500 ETF）",
+      "QQQ.US": "QQQ（纳斯达克100 ETF）"
+    },
+    "etfs": {
+      "510300": "沪深300",
+      "510500": "中证500",
+      "588000": "科创50",
+      "512480": "半导体",
+      "512660": "军工",
+      "512010": "医药",
+      "515790": "光伏",
+      "518880": "黄金",
+      "511010": "国债"
+    },
+    "etfReferenceCode": "510300",
+    "benchmarkDisplayNames": {
+      "SPY.US": "SPY · 标普 500 ETF",
+      "QQQ.US": "QQQ · 纳斯达克 100 ETF"
+    }
+  },
+  "collection": {
+    "maxPositions": 20,
+    "dailyBarCount": 8,
+    "staleAfterDays": 4,
+    "concurrency": 3
+  },
+  "requests": {
+    "marketTimeoutSeconds": 20,
+    "flowTimeoutSeconds": 15,
+    "instrumentTimeoutMs": 10000,
+    "directoryTimeoutMs": 10000,
+    "directoryCacheSeconds": 3600,
+    "tokenTimeoutSeconds": 25,
+    "gatewayTimeoutSeconds": 30
+  },
+  "ai": {
+    "endpoint": "https://api.deepseek.com/chat/completions",
+    "provider": "deepseek",
+    "model": "deepseek-flash",
+    "thinking": "disabled",
+    "monthlyBudgetCny": "10.00",
+    "reservePerCallCny": "0.20",
+    "maxRequestBytes": 60000,
+    "maxOutputTokens": 8192,
+    "peakInputCnyPerMillion": "2",
+    "peakOutputCnyPerMillion": "8",
+    "priceVerifiedOn": "2026-09-13",
+    "timeoutSeconds": 120
+  },
+  "mail": {
+    "host": "smtp.163.com",
+    "port": 465,
+    "timeoutSeconds": 30
+  }
+}

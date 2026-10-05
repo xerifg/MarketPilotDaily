@@ -1,11 +1,12 @@
 import { HttpError } from './auth';
+import settings from '../config/settings.json';
 
-const base = 'https://www.nasdaqtrader.com/dynamic/SymDir/';
+const base = settings.sources.nasdaq.directoryUrl;
 
 async function searchDirectory(file: string, code: string): Promise<'stock' | 'etf' | null> {
   let text: string;
   try {
-    const response = await fetch(`${base}${file}`, { signal: AbortSignal.timeout(10000), cf: { cacheTtl: 3600 } });
+    const response = await fetch(`${base}${file}`, { signal: AbortSignal.timeout(settings.requests.directoryTimeoutMs), cf: { cacheTtl: settings.requests.directoryCacheSeconds } });
     if (!response.ok) throw new Error('Directory unavailable');
     text = await response.text();
   } catch { throw new HttpError(503, '美股官方证券目录暂时不可用，无法核验股票／ETF 类型，请稍后重试。'); }

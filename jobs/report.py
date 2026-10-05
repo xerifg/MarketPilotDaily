@@ -1,6 +1,7 @@
 import json
 import re
 from jobs.deepseek import DeepSeekClient, DeepSeekError
+from jobs.settings import SETTINGS
 from jobs.market import portfolio_metrics
 from jobs.presentation import report_paragraphs
 from jobs.email_summary import validate_summary
@@ -67,7 +68,7 @@ def validate(content, holdings, evidence):
 def build_report(snapshot, evidence, cutoff, client: DeepSeekClient):
     metrics = portfolio_metrics(snapshot, evidence["quotes"])
     evidence['sources'].append({'id': 'P1', 'title': f"个人持仓快照 v{snapshot['revision']} 与同币种计算（需登录）",
-                                'url': 'https://market-pilot-daily.market-pilot-daily.workers.dev/',
+                                'url': SETTINGS['app']['origin'] + '/',
                                 'publishedAt': snapshot['updatedAt']})
     prompt = {"cutoff": cutoff.isoformat(), "holdings": metrics, "riskProfile": snapshot["profile"],
               "accountDrawdown": {"computed": False, "reason": "未提供账户净值历史，禁止据此承诺控制回撤或换算仓位目标"},

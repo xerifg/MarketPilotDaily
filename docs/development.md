@@ -58,7 +58,7 @@ API 的 `cash` 和 `cashAsOf` 分别返回 `{ CNY: ..., USD: ... }`，两种币�
 
 ## 已确认配置与预算实现
 
-用户已有 Cloudflare 免费账号，选择 DeepSeek 标准对话模式，每月预算 10 元。根据本轮查阅的官方文档，采用 `deepseek-flash` 并显式设置 `thinking.type=disabled`。旧别名不作为新实现默认配置；模型、限额与价格基准保存在 `config/ai.json`，不包含密钥。
+用户已有 Cloudflare 免费账号，选择 DeepSeek 标准对话模式，每月预算 10 元。根据本轮查阅的官方文档，采用 `deepseek-flash` 并显式设置 `thinking.type=disabled`。旧别名不作为新实现默认配置；模型、限额与价格基准保存在 `config/settings.json` 的 `ai` 分组，不包含密钥。
 
 Python 适配器 `jobs/deepseek.py` 使用官方 HTTPS 接口与 JSON 输出；限制输入体积和输出 token，不自动重试。调用前必须经过持久化预算网关，拒绝未预留预算的付费调用。D1 模块 `worker/ai-budget.ts` 与 `0003_ai_budget.sql` 按北京时间自然月原子预留，每次 0.20 元；并发和重复调用不能绕过预留限额。成功取得 usage 后按当前高峰价格保守结算，未知结果保留预留额度，避免失败后重复扣费。
 
