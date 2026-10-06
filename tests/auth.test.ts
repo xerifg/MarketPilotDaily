@@ -1,6 +1,6 @@
 import { afterEach, before, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { build } from 'esbuild';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
@@ -39,8 +39,10 @@ beforeEach(async () => {
     },
   }));
   db = await mf.getD1Database('DB') as unknown as D1Database;
-  const sql = await readFile('migrations/0004_github_auth.sql', 'utf8');
-  await db.batch(sql.trim().split(/;\s*(?=CREATE\b)/).map(statement => db.prepare(statement)));
+  for (const file of (await readdir('migrations')).filter(f => f.endsWith('.sql')).sort()) {
+    const sql = await readFile(`migrations/${file}`, 'utf8');
+    await db.batch(sql.trim().split(/;\s*(?=(?:CREATE|INSERT|ALTER|DROP)\b)/).map(statement => db.prepare(statement)));
+  }
 });
 afterEach(async () => { await mf?.dispose(); });
 

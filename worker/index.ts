@@ -5,7 +5,7 @@ import { lookupInstrument } from './instruments';
 import { getPortfolio, mutatePortfolio } from './portfolio';
 import { reportRoute, taskRoute } from './daily';
 import { getBudget } from './ai-budget';
-import { publicShare, manageShare } from './shares';
+import { publicShare, manageShare, latestShare } from './shares';
 
 interface Env extends AuthEnv { DB: D1Database; ASSETS: Fetcher }
 const revisionCheck = '(SELECT revision FROM portfolio_state WHERE id = 1) = ?';
@@ -15,7 +15,12 @@ async function handle(request: Request, env: Env): Promise<Response> {
   if (shared) return shared;
   if (new URL(request.url).pathname.startsWith('/internal/')) return taskRoute(request, env);
   const authResponse = await authRoute(request, env) ?? await authorize(request, env);
-  if (authResponse) return authResponse;
+  if (authResponse) {
+    if (request.method === 'GET' && new URL(request.url).pathname === '/' && authResponse.status === 200) {
+      return await latestShare(env.DB) ?? authResponse;
+    }
+    return authResponse;
+  }
   const shareResponse = await manageShare(request, env);
   if (shareResponse) return shareResponse;
   const reportResponse = await reportRoute(request, env);

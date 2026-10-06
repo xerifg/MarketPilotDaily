@@ -14,6 +14,13 @@ export async function shareLink(db: D1Database, id: string, origin: string, crea
   return { url: row && !row.revoked ? `${origin}/share/${row.token}` : null };
 }
 
+export async function latestShare(db: D1Database): Promise<Response | null> {
+  const row = await db.prepare(`SELECT s.token FROM report_shares s JOIN reports r ON r.id = s.report_id
+    WHERE s.revoked = 0 ORDER BY r.created_at DESC, r.id DESC LIMIT 1`).first<{ token: string }>();
+  return row ? new Response(null, { status: 302, headers: { Location: `/share/${row.token}`,
+    'X-Robots-Tag': 'noindex, nofollow, noarchive' } }) : null;
+}
+
 export async function manageShare(request: Request, env: AuthEnv): Promise<Response | null> {
   const match = /^\/api\/reports\/([^/]+)\/share$/.exec(new URL(request.url).pathname);
   if (!match) return null;
@@ -63,5 +70,5 @@ export async function publicShare(request: Request, env: AuthEnv): Promise<Respo
     const url = source.id === 'P1' ? undefined : safeUrl(source.url);
     return `<li>${url ? `<a href="${escape(url)}" target="_blank" rel="noopener noreferrer">${label}</a>` : label}<br><small>${escape(source.publishedAt)}</small></li>`;
   }).join('');
-  return page(report.title, `${content}<section><h2>来源索引</h2><ul>${sources}</ul></section><footer>这是单篇日报的分享页，持有链接即可阅读。先核实数据，再决定操作；本日报不自动交易。</footer>`);
+  return page(report.title, `${content}<section><h2>来源索引</h2><ul>${sources}</ul></section><footer>这是单篇日报的分享页，持有链接即可阅读。先核实数据，再决定操作；本日报不自动交易。<br><a href="/auth/login">登录管理</a></footer>`);
 }

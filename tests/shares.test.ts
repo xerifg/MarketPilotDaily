@@ -76,3 +76,31 @@ test('only owner can manage links; revocation is immediate and reenabling rotate
   assert.equal((await mf.dispatchFetch(original.url)).status, 404);
   assert.equal((await mf.dispatchFetch(next.url)).status, 200);
 });
+
+
+test('old email homepage links open the latest active share while owner access remains private', async () => {
+  const before = await mf.dispatchFetch(origin + '/');
+  assert.equal(before.status, 200);
+  const older = await (await manage('POST')).json() as { url: string };
+  const latestToken = 'c'.repeat(64);
+  await db.prepare('INSERT INTO report_shares (report_id, token) VALUES (?, ?)').bind('daily-2026-10-02', latestToken).run();
+  const response = await mf.dispatchFetch(origin + '/', { redirect: 'manual' });
+  assert.equal(response.status, 302);
+  assert.equal(response.headers.get('Location'), '/share/' + latestToken);
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  assert.match(response.headers.get('X-Robots-Tag')!, /noindex/);
+  const page = await mf.dispatchFetch(origin + response.headers.get('Location'));
+  assert.equal(page.status, 200);
+  assert.ok((await page.text()).includes('2026-10-02'));
+  assert.equal(await (await mf.dispatchFetch(origin + '/', { headers: { Cookie: `__Host-mp_session=${session}` } })).text(), 'private app');
+  assert.equal((await mf.dispatchFetch(origin + '/auth/login')).status, 200);
+  await db.prepare('UPDATE report_shares SET revoked = 1 WHERE report_id = ?').bind('daily-2026-10-02').run();
+  const fallback = await mf.dispatchFetch(origin + '/', { redirect: 'manual' });
+  assert.equal(fallback.headers.get('Location'), new URL(older.url).pathname);
+  assert.equal((await mf.dispatchFetch(origin + '/share/' + latestToken)).status, 404);
+  assert.equal((await mf.dispatchFetch(origin + '/api/portfolio')).status, 401);
+  await manage('DELETE');
+  const none = await mf.dispatchFetch(origin + '/');
+  assert.equal(none.status, 200);
+  assert.equal(none.headers.get('Location'), null);
+});
