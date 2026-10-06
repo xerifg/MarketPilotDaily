@@ -61,7 +61,9 @@ def build_message(config: MailConfig, report_id: str, subject: str,
         raise MailError("invalid_subject")
     if not paragraphs or len(paragraphs) > 100 or any(not isinstance(p, str) for p in paragraphs):
         raise MailError("invalid_mail_summary")
-    report_url = share_url or SETTINGS['app']['origin'] + '/'
+    if report and share_url is None:
+        raise MailError('missing_share_url')
+    report_url = share_url
     if share_url is not None and (not isinstance(share_url, str) or not re.fullmatch(
             re.escape(SETTINGS['app']['origin']) + r'/share/[a-f0-9]{64}', share_url)):
         raise MailError('invalid_share_url')

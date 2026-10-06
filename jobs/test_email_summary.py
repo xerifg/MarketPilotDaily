@@ -1,11 +1,12 @@
 from copy import deepcopy
+import re
 import unittest
 from unittest.mock import Mock, patch
 
 from jobs.daily import main
 from jobs.mail import MailConfig, build_message
 from jobs.email_summary import validate_summary
-from jobs.test_presentation import example_report
+from jobs.test_presentation import example_report, SHARE_URL
 
 
 def summary():
@@ -19,7 +20,7 @@ class EmailSummaryTests(unittest.TestCase):
     def message(self, report):
         config = MailConfig('example@163.com', 'fake', 'example@163.com', 'example@163.com')
         return build_message(config, 'summary-test', '日报', ['发送时间', *report['paragraphs']],
-                             [(s['title'], s['url']) for s in report['sources']], report)
+                             [(s['title'], s['url']) for s in report['sources']], report, share_url=SHARE_URL)
 
     def report(self):
         report = example_report()
@@ -138,6 +139,10 @@ class EmailSummaryTests(unittest.TestCase):
             body = message.get_body(preferencelist=(part,)).get_content()
             self.assertIn('今日结论', body)
             self.assertIn(share_url, body)
+            if part == 'html':
+                button = re.search(r'href="([^"]+)">查看完整日报</a>', body)
+                self.assertIsNotNone(button)
+                self.assertEqual(button.group(1), share_url)
             self.assertNotIn('市场收盘概览', body)
             self.assertNotIn('https://example.com/unused', body)
         gateway.finish.assert_called_once_with('test-2026-09-13', 'smtp_accepted', None)

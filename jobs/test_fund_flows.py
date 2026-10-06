@@ -12,7 +12,7 @@ from jobs.mail import MailConfig, build_message
 from jobs.market import collect
 from jobs.presentation import report_paragraphs
 from jobs.report import build_report, validate
-from jobs.test_presentation import example_report
+from jobs.test_presentation import example_report, SHARE_URL
 
 CUTOFF = datetime(2026, 9, 17, 0, tzinfo=timezone.utc)
 STAMP = int(datetime(2026, 9, 16, 8, tzinfo=timezone.utc).timestamp())
@@ -146,7 +146,7 @@ class FundFlowTests(unittest.TestCase):
         report['evidence']['analysisStatus'] = 'failed'
         report['sources'].extend(flow_sources(flows))
         config = MailConfig('example@163.com', 'fake', 'example@163.com', 'example@163.com')
-        message = build_message(config, 'flows-test', '日报', ['发送时间'], [], report)
+        message = build_message(config, 'flows-test', '日报', ['发送时间'], [], report, share_url=SHARE_URL)
         for part in ('plain', 'html'):
             body = message.get_body(preferencelist=(part,)).get_content()
             self.assertIn('资金流向重点', body)

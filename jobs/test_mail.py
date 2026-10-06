@@ -6,6 +6,13 @@ from jobs.mail import MailConfig, MailError, build_message, send_report
 
 
 class MailTests(unittest.TestCase):
+    def test_report_without_share_link_never_claims_or_sends_homepage_link(self):
+        from jobs.test_presentation import example_report
+        with patch('jobs.mail.smtplib.SMTP_SSL') as smtp, self.assertRaisesRegex(MailError, 'missing_share_url'):
+            send_report(self.config, self.gateway, 'id', '日报', ['摘要'], [], report=example_report())
+        self.gateway.claim.assert_not_called()
+        smtp.assert_not_called()
+
     def test_rejects_invalid_or_foreign_share_links(self):
         from jobs.settings import SETTINGS
         for url in ['javascript:alert(1)', 'https://other.example/share/' + 'a' * 64,

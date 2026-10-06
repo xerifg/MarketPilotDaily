@@ -6,6 +6,9 @@ from jobs.deepseek import JsonCompletion
 from jobs.mail import MailConfig, build_message
 from jobs.presentation import beijing, number, reading_lines, report_paragraphs
 from jobs.report import build_report
+from jobs.settings import SETTINGS
+
+SHARE_URL = SETTINGS['app']['origin'] + '/share/' + 'a' * 64
 
 
 def example_report(email_summary=None):
@@ -50,7 +53,7 @@ class PresentationTests(unittest.TestCase):
         self.assertIn('1.23亿 CNY', plain)
         self.assertLess(plain.index('先看重点'), plain.index('市场收盘概览'))
         config = MailConfig('example@163.com', 'fake', 'example@163.com', 'example@163.com')
-        message = build_message(config, 'preview', '测试日报', ['测试', *report['paragraphs']], [], report)
+        message = build_message(config, 'preview', '测试日报', ['测试', *report['paragraphs']], [], report, share_url=SHARE_URL)
         html = message.get_body(preferencelist=('html',)).get_content()
         self.assertIn('max-width:680px', html)
         self.assertIn('viewport', html)
