@@ -2,6 +2,7 @@ import settings from '../config/settings.json';
 import { Fragment, useEffect, useState } from 'react';
 import { api } from './api';
 import { FundFlows } from './FundFlows';
+import { Sectors } from './Sectors';
 import { ReportShare } from './ReportShare';
 import { beijing, benchmarks, number, readingLines, safeUrl, sections, type Report, type Source } from './report-format';
 
@@ -12,7 +13,7 @@ const states: Record<string, string> = { collecting: '正在采集与分析', re
   smtp_rejected: '163 拒绝接收', failed_before_data: '发送前失败', delivery_uncertain: '发送结果不确定，已停止自动重发' };
 
 function Text({ text, sources }: { text: string; sources: Source[] }) {
-  return <>{readingLines(text).map((line, i) => <p className="report-paragraph" key={i}>{line.split(/(\[[QNPF]\d+\])/g).map((part, j) => {
+  return <>{readingLines(text).map((line, i) => <p className="report-paragraph" key={i}>{line.split(/(\[[QNPFS]\d+\])/g).map((part, j) => {
     const source = sources.find(s => `[${s.id}]` === part);
     return source ? <a key={j} className="citation" href={safeUrl(source.url)} target="_blank" rel="noopener noreferrer" title={source.title}>{part}</a> : <Fragment key={j}>{part}</Fragment>;
   })}</p>)}</>;
@@ -29,7 +30,7 @@ function ReportBody({ report }: { report: Report }) {
       {evidence?.presentationVersion !== 2 && <p className="report-note">历史分析原文，仅调整排版；其中条件与阈值未按新版规则重新生成，请核对后使用。</p>}
       <section className="report-summary"><h3>先看重点</h3><Text text={advice.overview} sources={report.sources} /></section>
       <p className="report-note">指标说明：可承受回撤不是仓位上限。本系统未计算账户历史回撤，也不能保证某个仓位对应某个回撤上限。</p>
-      <nav className="report-nav" aria-label="日报目录"><a href="#plan-today">今日</a><a href="#plan-short">短期</a><a href="#plan-long">长期</a><a href="#report-market">行情</a>{evidence?.fundFlows && <a href="#report-flows">资金</a>}<a href="#report-news">新闻</a></nav>
+      <nav className="report-nav" aria-label="日报目录"><a href="#plan-today">今日</a><a href="#plan-short">短期</a><a href="#plan-long">长期</a><a href="#report-market">行情</a>{evidence?.sectors && <a href="#report-sectors">板块</a>}{evidence?.fundFlows && <a href="#report-flows">资金</a>}<a href="#report-news">新闻</a></nav>
       <div className="report-plans">{sections.map(([key, title, duration]) => <section className="report-plan" key={key} id={`plan-${key}`}>
         <h3><span>{title}</span><small>{duration}</small></h3><Text text={advice[key]} sources={report.sources} />
       </section>)}</div>
@@ -52,6 +53,7 @@ function ReportBody({ report }: { report: Report }) {
             <p>成交额 {number(quote.amount, true)}{quote.amount ? ` ${quote.currency}` : ''} <TextCitation id={quote.id} sources={report.sources} /></p>
             {quote.stale && <p className="quote-stale">数据偏旧，不能作为今日触发依据</p>}</>}
         </div>)}</div></section>
+      {evidence.sectors && <Sectors sectors={evidence.sectors} analysis={evidence.sectorAnalysis} sources={report.sources} />}
       {evidence.fundFlows && <FundFlows flows={evidence.fundFlows} />}
       <section className="report-section" id="report-news"><h3>过去 {evidence?.newsLookbackHours ?? 24} 小时 · 新闻线索</h3><p className="report-note">依据 RSS 标题与摘要，尚未核验全文。英文标题保留原文。</p>
         {evidence.news?.length ? <ol className="report-news">{evidence.news.map(item => <li key={item.id}><a href={safeUrl(item.url)} target="_blank" rel="noopener noreferrer">{item.title}</a><small>{beijing(item.publishedAt)} · 北京时间 · [{item.id}]</small></li>)}</ol> : <p>本期未检出符合时间窗口的相关新闻，不代表没有市场事件。</p>}

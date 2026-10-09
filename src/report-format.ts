@@ -14,7 +14,22 @@ export interface FundFlows { industry: FlowGroup; etf: FlowGroup; fetchedAt: str
 export interface Report { title: string; paragraphs: string[]; cutoffAt: string; model: string; estimatedCostCny: string; sources: Source[];
   evidence?: { presentationVersion?: number; analysisStatus?: string; analysisRaw?: Analysis | null;
     newsLookbackHours?: number; quotes?: Quote[]; news?: Source[]; coverage?: string[]; missing?: string[]; fundFlows?: FundFlows;
+    sectors?: Sectors; sectorAnalysis?: SectorAnalysis[];
     metrics?: { symbol: string; name: string; currency: string; weightPct: string | null; pnlPct: string | null }[] } }
+export interface SectorRow {
+  code: string; name: string; kind: 'industry' | 'etf'; date: string | null; stale: boolean;
+  changePct: string | null; returns: Record<string, string>; relative: Record<string, string>;
+  windows: Record<string, { start: string; end: string }>; amount: string | null;
+  net: string | null; net5: string | null; advancers: number | null; decliners: number | null;
+  sourceIds: string[]; sourceUrl: string; reasons: string[]; holdings: string[];
+  tracking?: string; trackingUrl?: string; flowDate?: string | null; flowStale?: boolean;
+}
+export interface SectorAnalysis { code: string; text: string; email: string }
+export interface Sectors {
+  rows: SectorRow[]; selectedCodes: string[]; detailCodes: string[]; date: string | null;
+  benchmarkDate: string | null; expectedCount: number; note: string; limitations: string[]; fetchedAt: string;
+  holdings: { symbol: string; name: string; code: string | null; note: string }[];
+}
 export const benchmarks: Record<string, string> = { ...settings.watchlist.benchmarks, ...settings.watchlist.benchmarkDisplayNames };
 export const sections = [['today', '今日', '行动计划'], ['short', '短期', '1–4 周'], ['long', '长期', '6–24 个月']] as const;
 export function beijing(value: string) {

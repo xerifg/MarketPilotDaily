@@ -64,6 +64,9 @@
     "eastmoney": {
       "industryUrl": "https://data.eastmoney.com/bkzj/hy.html",
       "industryApiUrl": "https://push2.eastmoney.com/api/qt/clist/get",
+      "klineApiUrl": "https://push2his.eastmoney.com/api/qt/stock/kline/get",
+      "sectorQuoteUrl": "https://quote.eastmoney.com/bk/90.{code}.html",
+      "benchmarkQuoteUrl": "https://quote.eastmoney.com/zs000300.html",
       "stockFlowApiUrl": "https://push2.eastmoney.com/api/qt/ulist.np/get",
       "stockInfoApiUrl": "https://push2.eastmoney.com/api/qt/stock/get",
       "referer": "https://data.eastmoney.com/",

@@ -1,6 +1,7 @@
 """Select the bounded email digest; the saved full report remains unchanged."""
 import re
 from jobs.flow_presentation import flow_highlights
+from jobs.sector_presentation import sector_email_lines
 
 
 def validate_summary(summary, sources):
@@ -48,6 +49,9 @@ def email_sections(report):
                     ('摘要状态', ['本期未生成可用的重点摘要，行动条件与风险请查看完整日报。'])]
     else:
         sections = [('分析状态', ['AI 建议未生成或未通过校验，请在完整日报中核对行情与新闻。'])]
+    sectors = sector_email_lines(evidence)
+    if sectors:
+        sections.append(('板块观察', sectors))
     flows = flow_highlights(evidence.get('fundFlows'))
     if flows:
         sections.append(('资金流向重点', flows))

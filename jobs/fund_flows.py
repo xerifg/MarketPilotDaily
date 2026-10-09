@@ -68,7 +68,16 @@ def parse_industries(raw, cutoff):
             net5 = str(decimal(item.get('f164')))
         except (ValueError, InvalidOperation):
             net5 = None
-        rows.append(dict(code=code, name=name, date=day, net=net, net5=net5, stale=stale(day, cutoff),
+        optional = {}
+        for field, key in [('f3', 'changePct'), ('f6', 'amount'), ('f104', 'advancers'), ('f105', 'decliners')]:
+            try:
+                value = decimal(item.get(field))
+                if key != 'changePct' and (value < 0 or key in ('advancers', 'decliners') and value != int(value)):
+                    raise ValueError('invalid_sector_statistic')
+                optional[key] = str(value) if key in ('changePct', 'amount') else int(value)
+            except (ValueError, InvalidOperation):
+                optional[key] = None
+        rows.append(dict(code=code, name=name, date=day, net=net, net5=net5, stale=stale(day, cutoff), **optional,
                          sourceIds=['F1'], sourceUrl=SOURCES['eastmoney']['industryDetailUrl'].format(code=code)))
     # Never compare rankings from different sessions.
     latest = max((row['date'] for row in rows), default=None)
@@ -80,7 +89,7 @@ def read_industries(cutoff):
     for page in range(1, 7):
         data = fetch_json(SOURCES['eastmoney']['industryApiUrl'], dict(
             pn=page, pz=100, po=1, np=1, fltt=2, invt=2, fid='f62', fs='m:90 s:4',
-            fields='f12,f14,f62,f164,f124'), INDUSTRY_URL)['data']
+            fields='f12,f14,f3,f6,f104,f105,f62,f164,f124'), INDUSTRY_URL)['data']
         if total is not None and total != data['total']:
             raise ValueError('industry_universe_changed')
         total = data['total']

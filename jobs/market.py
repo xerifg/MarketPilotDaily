@@ -12,6 +12,7 @@ import xml.etree.ElementTree as ET
 from zoneinfo import ZoneInfo
 from jobs.fund_flows import collect_flows, flow_sources
 from jobs.settings import SETTINGS
+from jobs.sectors import collect_sectors, sector_sources
 
 BENCHMARKS = SETTINGS["watchlist"]["benchmarks"]
 FEEDS = SETTINGS["news"]["feeds"]
@@ -93,9 +94,10 @@ def parse_feed(raw, cutoff):
     return sorted(items, key=lambda item: datetime.fromisoformat(item["publishedAt"]), reverse=True)
 
 
-def news_relevance(title, positions):
+def news_relevance(title, positions, sector_names=None):
     keywords = [p["name"] for p in positions] + [p["symbol"].removesuffix('.US') for p in positions if p["symbol"].endswith('.US')]
     keywords += SETTINGS["news"]["keywords"]
+    keywords += sector_names or []
     return sum(bool(re.search(r'\b' + re.escape(word) + r'\b', title, re.I)) if word.isascii()
                else word in title for word in keywords)
 
@@ -105,6 +107,8 @@ def collect(snapshot, cutoff):
     symbols = list(dict.fromkeys([*BENCHMARKS, *(p["symbol"] for p in positions[:SETTINGS["collection"]["maxPositions"]])]))
     with ThreadPoolExecutor(max_workers=SETTINGS["collection"]["concurrency"]) as pool:
         quotes = list(pool.map(lambda symbol: read_quote(symbol, cutoff), symbols))
+    flows = collect_flows(positions, cutoff)
+    sector_names = [row['name'] for row in flows['industry']['rows']]
     news, coverage = [], []
     for feed in FEEDS:
         if not feed["enabled"]:
@@ -113,16 +117,17 @@ def collect(snapshot, cutoff):
         try:
             items = parse_feed(fetch(url), cutoff)
             # Prefer relevant company names, then market and policy topics, then recency.
-            relevant = [item for item in items if not feed["filterByKeywords"] or news_relevance(item['title'], positions) > 0]
-            relevant.sort(key=lambda item: -news_relevance(item['title'], positions))
+            relevant = [item for item in items if not feed["filterByKeywords"] or news_relevance(item['title'], positions, sector_names) > 0]
+            relevant.sort(key=lambda item: -news_relevance(item['title'], positions, sector_names))
             limit = feed["maxItems"]
             news.extend({**item, "publisher": publisher} for item in relevant[:limit])
             coverage.append(f"{publisher}：过去{SETTINGS['news']['lookbackHours']}小时检出{len(items)}条，选入{min(limit, len(relevant))}条；仅依据RSS摘要。")
         except Exception:
             coverage.append(f"{publisher}：本次获取失败，不代表没有新闻。")
-    flows = collect_flows(positions, cutoff)
-    # Reserve four flow sources and one portfolio source within the 40-source limit.
-    news = news[:max(0, 35 - len(quotes))]
+    sectors = collect_sectors(positions, flows, cutoff)
+    additional_sources = flow_sources(flows) + sector_sources(sectors)
+    # Reserve deterministic sources and the portfolio source before choosing news.
+    news = news[:max(0, 39 - len(quotes) - len(additional_sources))]
     missing = ["未接入两融、估值、财报与完整未来事件日历；不能据此判断不存在利空。",
                "未核验完整交易所节假日历；行情为最近可取得日线，开市与交易限制需另行确认。",
                "涨跌为不复权收盘价变化，除权除息可能影响；不代表含分红总回报。"]
@@ -138,10 +143,12 @@ def collect(snapshot, cutoff):
     for article in news:
         article["id"] = f"N{len(sources)+1}"
         sources.append({k: article[k] for k in ("id", "title", "url", "publishedAt")})
-    sources.extend(flow_sources(flows))
+    sources.extend(additional_sources)
     missing.extend(flows['limitations'])
+    missing.extend(sectors['limitations'])
     coverage.append(f"资金数据：行业 {len(flows['industry']['rows'])} 项，沪市ETF观察池 {len(flows['etf']['rows'])} 项，关联持仓 {len(flows['holdings'])} 项。")
-    return {"newsLookbackHours": SETTINGS["news"]["lookbackHours"], "quotes": quotes, "news": news, "coverage": coverage, "missing": missing, "sources": sources, "fundFlows": flows}
+    coverage.append(f"板块观察：行业快照 {len(flows['industry']['rows'])} 项，重点及持仓关联 {len(sectors['selectedCodes'])} 项；历史走势仅补采关联项。")
+    return {"newsLookbackHours": SETTINGS["news"]["lookbackHours"], "quotes": quotes, "news": news, "coverage": coverage, "missing": missing, "sources": sources, "fundFlows": flows, "sectors": sectors}
 
 
 def portfolio_metrics(snapshot, quotes):

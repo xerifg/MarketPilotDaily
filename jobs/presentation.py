@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from jobs.market import BENCHMARKS
 from jobs.email_summary import email_sections
 from jobs.flow_presentation import full_flow_sections
+from jobs.sector_presentation import full_sector_sections
 
 SECTIONS = [('overview', '先看重点'), ('today', '今日 · 行动计划'),
             ('short', '短期 · 1–4 周'), ('long', '长期 · 6–24 个月'), ('watch', '事件与风险')]
@@ -77,6 +78,7 @@ def report_sections(report):
                           f"{' ' + quote['currency'] if quote.get('amount') else ''} [{quote['id']}]"
                           + (' · 数据偏旧，不能作为今日触发依据' if quote.get('stale') else ''))
     sections.append(('市场收盘概览', market or ['本期无可用行情。']))
+    sections.extend(full_sector_sections(evidence))
     sections.extend(full_flow_sections(evidence.get('fundFlows')))
     sections.append((f"过去 {evidence.get('newsLookbackHours', 24)} 小时 · 新闻线索", [f"{item['title']} [{item['id']}]\n{beijing(item['publishedAt'])}（北京时间）"
                     for item in evidence.get('news', [])] or ['本期未检出符合时间窗口的相关新闻；不代表没有市场事件。']))
