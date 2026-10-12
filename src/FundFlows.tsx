@@ -23,9 +23,9 @@ function FlowRanking({ group, etf = false }: { group: FlowGroup; etf?: boolean }
   const incoming = fresh.filter(row => Number(row[period]) > 0).sort((a, b) => Number(b[period]) - Number(a[period])).slice(0, 3);
   const outgoing = fresh.filter(row => Number(row[period]) < 0).sort((a, b) => Number(a[period]) - Number(b[period])).slice(0, 3);
   const ordered = [...group.rows].sort((a, b) => (b[period] === null ? -Infinity : Number(b[period])) - (a[period] === null ? -Infinity : Number(a[period])));
-  return <div className="flow-group"><h4>{etf ? 'ETF净申赎 · 沪市观察池' : '行业资金 · 主力交易统计'}</h4>
+  return <div className="flow-group"><h4>{etf ? 'ETF净申赎 · 沪深观察池' : '行业资金 · 主力交易统计'}</h4>
     <p className="report-note">{group.note}</p>
-    <p className="flow-meta">统计日 {group.date ?? '未知'} · 已取得 {group.rows.length}/{group.expectedCount} 项{group.status !== 'ok' ? ' · 覆盖不完整' : ''}</p>
+    <p className="flow-meta">统计日 {group.date ?? '未知'} · 已取得 {group.rows.length}/{group.expectedCount || '总数未知'} 项{group.status !== 'ok' ? ' · 覆盖不完整' : ''}</p>
     {group.rows.length ? <>
       <div className="flow-period" aria-label="资金排名周期"><button type="button" className="text-button" aria-pressed={period === 'net'} onClick={() => setPeriod('net')}>当日</button>
         <button type="button" className="text-button" aria-pressed={period === 'net5'} onClick={() => setPeriod('net5')}>近5日</button></div>

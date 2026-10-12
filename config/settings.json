@@ -65,6 +65,7 @@
       "industryUrl": "https://data.eastmoney.com/bkzj/hy.html",
       "industryApiUrl": "https://push2.eastmoney.com/api/qt/clist/get",
       "klineApiUrl": "https://push2his.eastmoney.com/api/qt/stock/kline/get",
+      "flowHistoryApiUrl": "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get",
       "sectorQuoteUrl": "https://quote.eastmoney.com/bk/90.{code}.html",
       "benchmarkQuoteUrl": "https://quote.eastmoney.com/zs000300.html",
       "stockFlowApiUrl": "https://push2.eastmoney.com/api/qt/ulist.np/get",
@@ -77,6 +78,11 @@
     "sse": {
       "sharesUrl": "https://query.sse.com.cn/commonQuery.do",
       "referer": "https://www.sse.com.cn/"
+    },
+    "szse": {
+      "reportUrl": "https://www.szse.cn/api/report/ShowReport/data",
+      "sharesUrl": "https://www.szse.cn/market/fund/volume/etf/index.html",
+      "referer": "https://www.szse.cn/"
     },
     "fund": {
       "navUrl": "https://api.fund.eastmoney.com/f10/lsjz",

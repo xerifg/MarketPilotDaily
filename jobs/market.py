@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 from jobs.fund_flows import collect_flows, flow_sources
 from jobs.settings import SETTINGS
 from jobs.sectors import collect_sectors, sector_sources
+from jobs.calendar import session_lag, trading_day, latest_closed_session
 
 BENCHMARKS = SETTINGS["watchlist"]["benchmarks"]
 FEEDS = SETTINGS["news"]["feeds"]
@@ -43,11 +44,14 @@ def parse_bars(symbol, data, cutoff):
         raise ValueError("inconsistent_bars")
     tz = ZoneInfo("America/New_York" if symbol.endswith(".US") else "Asia/Shanghai")
     rows = []
+    last_closed = latest_closed_session(cutoff, 'US' if symbol.endswith('.US') else 'CN')
     for stamp, close, volume, amount in zip(*columns):
         day = datetime.fromtimestamp(stamp / 1000, tz).date()
+        if trading_day(day, 'US' if symbol.endswith('.US') else 'CN') is False:
+            continue
         # Exclude a current session until after the usual close. No intraday quotes.
         local = cutoff.astimezone(tz)
-        if day > local.date() or (day == local.date() and local.hour < (17 if symbol.endswith(".US") else 16)):
+        if last_closed is not None and day > last_closed or last_closed is None and (day > local.date() or (day == local.date() and local.hour < (17 if symbol.endswith(".US") else 16))):
             continue
         price = number(close)
         if price > 0:
@@ -57,10 +61,13 @@ def parse_bars(symbol, data, cutoff):
         raise ValueError("insufficient_or_duplicate_bars")
     current, previous = rows[-1], rows[-2]
     age = (cutoff.astimezone(tz).date() - current[0]).days
+    lag = session_lag(str(current[0]), cutoff, 'US' if symbol.endswith('.US') else 'CN')
     return {"symbol": symbol, "sessionDate": str(current[0]), "previousSessionDate": str(previous[0]),
             "close": str(current[1]), "changePct": percent((current[1] / previous[1] - 1) * 100),
             "amount": str(current[3]) if current[3] > 0 else None,
-            "stale": age > SETTINGS["collection"]["staleAfterDays"], "ageDays": age, "adjustment": "none",
+            "volume": str(current[2]),
+            "stale": (lag if lag is not None else age) > SETTINGS["collection"]["staleAfterDays"],
+            "ageDays": age, "lagSessions": lag, "adjustment": "none",
             "currency": "USD" if symbol.endswith(".US") else "CNY"}
 
 
@@ -98,11 +105,17 @@ def news_relevance(title, positions, sector_names=None):
     keywords = [p["name"] for p in positions] + [p["symbol"].removesuffix('.US') for p in positions if p["symbol"].endswith('.US')]
     keywords += SETTINGS["news"]["keywords"]
     keywords += sector_names or []
-    return sum(bool(re.search(r'\b' + re.escape(word) + r'\b', title, re.I)) if word.isascii()
+    # Short commodity words also occur in place names and agricultural metaphors.
+    commodity = {'铜': r'铜(?:价|矿|业|材|箔|冶炼|期货|供需|库存)',
+                 '铝': r'铝(?:价|矿|业|材|箔|冶炼|期货|供需|库存)',
+                 '黄金': r'黄金(?:ETF|价格|期货|现货|储备|市场|矿|交易|需求)|金价'}
+    return sum(bool(re.search(commodity[word], title, re.I)) if word in commodity
+               else bool(re.search(r'\b' + re.escape(word) + r'\b', title, re.I)) if word.isascii()
                else word in title for word in keywords)
 
 
 def collect(snapshot, cutoff):
+    from jobs.market_context import collect_context, context_sources
     positions = snapshot["positions"]
     symbols = list(dict.fromkeys([*BENCHMARKS, *(p["symbol"] for p in positions[:SETTINGS["collection"]["maxPositions"]])]))
     with ThreadPoolExecutor(max_workers=SETTINGS["collection"]["concurrency"]) as pool:
@@ -125,11 +138,12 @@ def collect(snapshot, cutoff):
         except Exception:
             coverage.append(f"{publisher}：本次获取失败，不代表没有新闻。")
     sectors = collect_sectors(positions, flows, cutoff)
-    additional_sources = flow_sources(flows) + sector_sources(sectors)
+    context = collect_context(cutoff)
+    additional_sources = flow_sources(flows) + sector_sources(sectors) + context_sources(context)
     # Reserve deterministic sources and the portfolio source before choosing news.
     news = news[:max(0, 39 - len(quotes) - len(additional_sources))]
-    missing = ["未接入两融、估值、财报与完整未来事件日历；不能据此判断不存在利空。",
-               "未核验完整交易所节假日历；行情为最近可取得日线，开市与交易限制需另行确认。",
+    missing = ["个券／跟踪指数估值、成分公司财报与完整未来事件日历仍未完整覆盖；不能据此判断不存在利空。",
+               context['calendar']['limitation'],
                "涨跌为不复权收盘价变化，除权除息可能影响；不代表含分红总回报。"]
     if not positions:
         missing.append("尚未填写真实持仓，本次只能提供市场观察，不能作个人买卖或仓位建议。")
@@ -146,9 +160,24 @@ def collect(snapshot, cutoff):
     sources.extend(additional_sources)
     missing.extend(flows['limitations'])
     missing.extend(sectors['limitations'])
-    coverage.append(f"资金数据：行业 {len(flows['industry']['rows'])} 项，沪市ETF观察池 {len(flows['etf']['rows'])} 项，关联持仓 {len(flows['holdings'])} 项。")
+    missing.extend(context['limitations'])
+    coverage.append(f"资金数据：行业 {len(flows['industry']['rows'])} 项，沪深ETF观察池 {len(flows['etf']['rows'])} 项，关联持仓 {len(flows['holdings'])} 项。")
     coverage.append(f"板块观察：行业快照 {len(flows['industry']['rows'])} 项，重点及持仓关联 {len(sectors['selectedCodes'])} 项；历史走势仅补采关联项。")
-    return {"newsLookbackHours": SETTINGS["news"]["lookbackHours"], "quotes": quotes, "news": news, "coverage": coverage, "missing": missing, "sources": sources, "fundFlows": flows, "sectors": sectors}
+    issues = []
+    if any(quote.get('missing') or quote.get('stale') for quote in quotes):
+        issues.append('quotes_incomplete')
+    if flows['industry'].get('status') != 'ok':
+        issues.append('industry_unavailable_or_cached')
+    if flows['etf'].get('status') != 'ok':
+        issues.append('etf_flows_incomplete')
+    if any(len(row['returns']) < 3 for row in sectors['rows'] if row['kind'] == 'etf'):
+        issues.append('etf_history_incomplete')
+    if len(context['margin']) != 2 or any(row['stale'] for row in context['margin']):
+        issues.append('margin_incomplete')
+    if not context.get('valuation') or context['valuation']['stale']:
+        issues.append('valuation_incomplete')
+    return {"newsLookbackHours": SETTINGS["news"]["lookbackHours"], "quotes": quotes, "news": news, "coverage": coverage, "missing": missing, "sources": sources, "fundFlows": flows, "sectors": sectors, "marketContext": context,
+            "dataQuality": dict(status='degraded' if issues else 'ok', issues=issues)}
 
 
 def portfolio_metrics(snapshot, quotes):

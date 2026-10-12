@@ -2,17 +2,17 @@ import settings from '../config/settings.json';
 
 export interface Source { id: string; title: string; url: string; publishedAt: string }
 export interface Quote { id: string; symbol: string; missing?: boolean; close: string; changePct: string; currency: string;
-  sessionDate: string; previousSessionDate: string; amount: string | null; stale: boolean }
+  sessionDate: string; previousSessionDate: string; amount: string | null; volume?: string; stale: boolean }
 export interface Analysis { overview: string; today: string; short: string; long: string; watch: string;
   holdings: { symbol: string; advice: string }[] }
 export interface FlowRow { code: string; name: string; date: string; net: string; net5: string | null;
   stale: boolean; sourceIds: string[]; sourceUrl: string; previousDate?: string; shareChange?: string; navDate?: string }
 export interface FlowGroup { status: 'ok' | 'partial' | 'missing'; date: string | null; rows: FlowRow[];
-  expectedCount: number; note: string }
+  expectedCount: number | null; note: string }
 export interface FundFlows { industry: FlowGroup; etf: FlowGroup; fetchedAt: string; limitations: string[];
   holdings: { symbol: string; name: string; kind: string; flow: FlowRow | null; industryCode: string | null; note: string }[] }
 export interface Report { title: string; paragraphs: string[]; cutoffAt: string; model: string; estimatedCostCny: string; sources: Source[];
-  evidence?: { presentationVersion?: number; analysisStatus?: string; analysisRaw?: Analysis | null;
+  evidence?: { presentationVersion?: number; analysisStatus?: string; analysisRaw?: Analysis | null; analysisFallback?: Analysis;
     newsLookbackHours?: number; quotes?: Quote[]; news?: Source[]; coverage?: string[]; missing?: string[]; fundFlows?: FundFlows;
     sectors?: Sectors; sectorAnalysis?: SectorAnalysis[];
     metrics?: { symbol: string; name: string; currency: string; weightPct: string | null; pnlPct: string | null }[] } }
@@ -27,7 +27,7 @@ export interface SectorRow {
 export interface SectorAnalysis { code: string; text: string; email: string }
 export interface Sectors {
   rows: SectorRow[]; selectedCodes: string[]; detailCodes: string[]; date: string | null;
-  benchmarkDate: string | null; expectedCount: number; note: string; limitations: string[]; fetchedAt: string;
+  benchmarkDate: string | null; expectedCount: number | null; note: string; limitations: string[]; fetchedAt: string;
   holdings: { symbol: string; name: string; code: string | null; note: string }[];
 }
 export const benchmarks: Record<string, string> = { ...settings.watchlist.benchmarks, ...settings.watchlist.benchmarkDisplayNames };

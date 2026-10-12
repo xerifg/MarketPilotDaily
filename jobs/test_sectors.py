@@ -15,6 +15,7 @@ from jobs.sectors import collect_sectors, parse_history, performance, read_track
 from jobs.sector_presentation import sector_email_lines, validate_sector_analysis
 from jobs.test_fund_flows import CUTOFF, flows_fixture, industry
 from jobs.test_presentation import example_report, SHARE_URL
+from jobs.test_market_context import context_fixture
 
 
 def history():
@@ -114,12 +115,15 @@ class SectorTests(unittest.TestCase):
         flows = flows_fixture()
         sectors = collect_sectors([dict(symbol='510300.SH', name='示例ETF', assetType='etf')], flows, CUTOFF)
         self.assertIsNone(sectors['holdings'][0]['code'])
-        self.assertFalse(any(row['kind'] == 'etf' for row in sectors['rows']))
+        row = next(row for row in sectors['rows'] if row['kind'] == 'etf')
+        self.assertFalse(row['trackingVerified'])
+        self.assertEqual(row['tracking'], '未核验')
         self.assertIsNone(sectors['benchmarkDate'])
         self.assertTrue(any('未核验' in line for line in sectors['limitations']))
 
     @patch('jobs.sectors.urlopen')
-    def test_tracking_profile_checks_identity_and_requires_a_real_target(self, open_url):
+    @patch('jobs.sectors.read_reports', return_value=[])
+    def test_tracking_profile_checks_identity_and_requires_a_real_target(self, _reports, open_url):
         response = open_url.return_value.__enter__.return_value
         response.read.return_value = '<h1>示例ETF(510300)</h1><p>跟踪标的：沪深300指数 | 年化跟踪误差：0.1%</p>'.encode()
         self.assertEqual(read_tracking('510300.SH')['target'], '沪深300指数')
@@ -166,8 +170,8 @@ class SectorTests(unittest.TestCase):
         content['sectorAnalysis'][0]['email'] = '坏的引用[S99]'
         saved = build_report(snapshot, evidence, CUTOFF, client)
         self.assertEqual(saved['evidence']['analysisStatus'], 'ok')
-        self.assertNotIn('sectorAnalysis', saved['evidence'])
-        self.assertIn('未生成可用', '\n'.join(sector_email_lines(saved['evidence'])))
+        self.assertEqual(saved['evidence']['sectorAnalysisMode'], 'verified_facts')
+        self.assertIn('收盘', '\n'.join(sector_email_lines(saved['evidence'])))
 
     def test_stale_snapshots_and_history_date_mismatch_do_not_become_current(self):
         flows = flows_fixture()
@@ -202,6 +206,7 @@ class SectorTests(unittest.TestCase):
         snapshot = dict(positions=positions, cash={'CNY': None, 'USD': None}, profile={}, revision=1, updatedAt=CUTOFF.isoformat())
         articles = [dict(title='market', summary='合成新闻', url=f'https://example.com/news/{i}', publishedAt=CUTOFF.isoformat()) for i in range(5)]
         with patch('jobs.market.collect_flows', return_value=flows), patch('jobs.sectors.read_history', return_value=history()), \
+                patch('jobs.market_context.collect_context', return_value=context_fixture()), \
                 patch('jobs.market.read_quote', side_effect=lambda symbol, cutoff: dict(symbol=symbol, missing=True, sourceUrl='https://example.com/quote')), \
                 patch('jobs.market.fetch', return_value=b'<rss/>'), patch('jobs.market.parse_feed', return_value=articles):
             evidence = collect(snapshot, CUTOFF)

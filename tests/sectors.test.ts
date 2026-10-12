@@ -42,3 +42,13 @@ test('empty sector coverage has a clear state without fabricating a ranking', ()
   assert.ok(html.includes('尚无持仓'));
   assert.ok(html.includes('未知'));
 });
+
+test('missing ETF history is not rendered as old data and unknown coverage does not become zero', () => {
+  const sectors = fixture();
+  sectors.expectedCount = null;
+  sectors.rows = [{ ...row, kind: 'etf', date: null, stale: true, returns: {}, relative: {}, flowDate: null, flowStale: true }];
+  const html = renderToStaticMarkup(createElement(Sectors, { sectors, sources: [] }));
+  assert.ok(html.includes('历史行情未取得'));
+  assert.ok(html.includes('总数未知'));
+  assert.ok(!html.includes('已取得数据偏旧'));
+});

@@ -33,7 +33,7 @@ def main():
         gateway.run_id = run["id"]
         if run["delivery"]:
             print("status=delivery_already_recorded")
-            return 0
+            return 1 if (run.get('report') or {}).get('evidence', {}).get('dataQuality', {}).get('status') == 'degraded' else 0
         report = run["report"]
         if not report:
             if not run["owned"] or run["state"] != "collecting":
@@ -65,6 +65,9 @@ def main():
         share_url = gateway.action('share-link')['url']
         state = send_report(config, gateway, run["id"], title, paragraphs, [], report=report, share_url=share_url)
         print("status=" + state)
+        if state == 'smtp_accepted' and report['evidence'].get('dataQuality', {}).get('status') == 'degraded':
+            print('status=data_degraded')
+            return 1
         return 0 if state == "smtp_accepted" else 1
     except MailError as error:
         print("status=" + str(error))  # MailError is restricted to code constants.

@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlsplit
 from jobs import market
 from jobs.presentation import email_paragraphs, report_paragraphs
 from jobs.settings import SETTINGS
+from jobs.test_market_context import context_fixture
 
 
 class SettingsTests(unittest.TestCase):
@@ -21,6 +22,7 @@ class SettingsTests(unittest.TestCase):
         with patch.object(market, 'FEEDS', feeds), patch.object(market, 'BENCHMARKS', {}), \
                 patch.object(market, 'fetch') as fetch, patch.object(market, 'parse_feed', return_value=articles), \
                 patch.object(market, 'collect_flows', return_value=flows), patch.object(market, 'flow_sources', return_value=[]), \
+                patch('jobs.market_context.collect_context', return_value=context_fixture()), \
                 patch.dict(SETTINGS['news'], lookbackHours=48):
             evidence = market.collect({'positions': []}, datetime(2026, 9, 13, tzinfo=timezone.utc))
         self.assertEqual([call.args[0] for call in fetch.call_args_list], [feeds[1]['url'], feeds[2]['url']])

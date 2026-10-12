@@ -13,7 +13,7 @@ const states: Record<string, string> = { collecting: '正在采集与分析', re
   smtp_rejected: '163 拒绝接收', failed_before_data: '发送前失败', delivery_uncertain: '发送结果不确定，已停止自动重发' };
 
 function Text({ text, sources }: { text: string; sources: Source[] }) {
-  return <>{readingLines(text).map((line, i) => <p className="report-paragraph" key={i}>{line.split(/(\[[QNPFS]\d+\])/g).map((part, j) => {
+  return <>{readingLines(text).map((line, i) => <p className="report-paragraph" key={i}>{line.split(/(\[[QNPFSD]\d+\])/g).map((part, j) => {
     const source = sources.find(s => `[${s.id}]` === part);
     return source ? <a key={j} className="citation" href={safeUrl(source.url)} target="_blank" rel="noopener noreferrer" title={source.title}>{part}</a> : <Fragment key={j}>{part}</Fragment>;
   })}</p>)}</>;
@@ -21,12 +21,13 @@ function Text({ text, sources }: { text: string; sources: Source[] }) {
 
 function ReportBody({ report }: { report: Report }) {
   const evidence = report.evidence;
-  const advice = evidence?.analysisStatus === 'ok' ? evidence.analysisRaw : null;
+  const advice = evidence?.analysisStatus === 'ok' ? evidence.analysisRaw : evidence?.analysisFallback;
   const names = Object.fromEntries((evidence?.metrics ?? []).map(m => [m.symbol, m.name]));
   return <article className="report-content">
     <header className="report-masthead"><span className="eyebrow">MARKETPILOT / DAILY BRIEF</span><h2>{report.title}</h2>
       <p>信息截止 {beijing(report.cutoffAt)}（北京时间）</p><p>新闻窗口：此前 {evidence?.newsLookbackHours ?? 24} 小时 · 行情：最近可取得收盘价</p></header>
     {advice && <>
+      {evidence?.analysisStatus !== 'ok' && <p className="report-note">AI正文未通过校验，以下为程序根据已核验数据生成的事实复查。</p>}
       {evidence?.presentationVersion !== 2 && <p className="report-note">历史分析原文，仅调整排版；其中条件与阈值未按新版规则重新生成，请核对后使用。</p>}
       <section className="report-summary"><h3>先看重点</h3><Text text={advice.overview} sources={report.sources} /></section>
       <p className="report-note">指标说明：可承受回撤不是仓位上限。本系统未计算账户历史回撤，也不能保证某个仓位对应某个回撤上限。</p>
@@ -51,10 +52,15 @@ function ReportBody({ report }: { report: Report }) {
             <b className={Number(quote.changePct) > 0 ? 'quote-up' : Number(quote.changePct) < 0 ? 'quote-down' : ''}>{number(quote.changePct, false, true)}%</b></div>
             <p>收盘日 {quote.sessionDate}<br />对比 {quote.previousSessionDate}</p>
             <p>成交额 {number(quote.amount, true)}{quote.amount ? ` ${quote.currency}` : ''} <TextCitation id={quote.id} sources={report.sources} /></p>
+            {quote.amount === null && quote.volume !== undefined && <p>成交量 {number(quote.volume)} 股／份；实际成交额未提供。</p>}
             {quote.stale && <p className="quote-stale">数据偏旧，不能作为今日触发依据</p>}</>}
         </div>)}</div></section>
       {evidence.sectors && <Sectors sectors={evidence.sectors} analysis={evidence.sectorAnalysis} sources={report.sources} />}
       {evidence.fundFlows && <FundFlows flows={evidence.fundFlows} />}
+      {report.paragraphs.filter(text => ['交易日与已核验事件\n', '融资融券余额\n', '沪深300指数估值\n', 'ETF基本资料与报告入口\n'].some(title => text.startsWith(title))).map((text, index) => {
+        const [title, ...lines] = text.split('\n');
+        return <section className="report-section" key={index}><h3>{title}</h3><Text text={lines.join('\n')} sources={report.sources} /></section>;
+      })}
       <section className="report-section" id="report-news"><h3>过去 {evidence?.newsLookbackHours ?? 24} 小时 · 新闻线索</h3><p className="report-note">依据 RSS 标题与摘要，尚未核验全文。英文标题保留原文。</p>
         {evidence.news?.length ? <ol className="report-news">{evidence.news.map(item => <li key={item.id}><a href={safeUrl(item.url)} target="_blank" rel="noopener noreferrer">{item.title}</a><small>{beijing(item.publishedAt)} · 北京时间 · [{item.id}]</small></li>)}</ol> : <p>本期未检出符合时间窗口的相关新闻，不代表没有市场事件。</p>}
       </section>

@@ -8,6 +8,7 @@ from jobs.market import BENCHMARKS
 from jobs.email_summary import email_sections
 from jobs.flow_presentation import full_flow_sections
 from jobs.sector_presentation import full_sector_sections
+from jobs.market_context import context_sections
 
 SECTIONS = [('overview', '先看重点'), ('today', '今日 · 行动计划'),
             ('short', '短期 · 1–4 周'), ('long', '长期 · 6–24 个月'), ('watch', '事件与风险')]
@@ -56,9 +57,11 @@ def reading_lines(text):
 
 def report_sections(report):
     evidence = report.get('evidence', {})
-    analysis = evidence.get('analysisRaw') if evidence.get('analysisStatus') == 'ok' else None
+    analysis = evidence.get('analysisRaw') if evidence.get('analysisStatus') == 'ok' else evidence.get('analysisFallback')
     sections = []
     if analysis:
+        if evidence.get('analysisStatus') != 'ok':
+            sections.append(('分析状态', ['AI正文未生成或未通过校验，以下为程序根据已核验数据生成的事实复查。']))
         sections.extend((title, reading_lines(analysis[key])) for key, title in SECTIONS)
         names = {row['symbol']: row['name'] for row in evidence.get('metrics', [])}
         sections.extend((f"持仓复查 · {names.get(row['symbol'], row['symbol'])}（{row['symbol']}）", reading_lines(row['advice']))
@@ -77,9 +80,12 @@ def report_sections(report):
                           f"\n收盘日 {quote['sessionDate']}，对比 {quote['previousSessionDate']}；成交额 {number(quote.get('amount'), amount=True)}"
                           f"{' ' + quote['currency'] if quote.get('amount') else ''} [{quote['id']}]"
                           + (' · 数据偏旧，不能作为今日触发依据' if quote.get('stale') else ''))
+            if quote.get('amount') is None and quote.get('volume') is not None:
+                market[-1] += f"\n成交量 {number(quote['volume'])} 股／份；来源未提供实际成交额，不以收盘价乘成交量代替。"
     sections.append(('市场收盘概览', market or ['本期无可用行情。']))
     sections.extend(full_sector_sections(evidence))
     sections.extend(full_flow_sections(evidence.get('fundFlows')))
+    sections.extend(context_sections(evidence.get('marketContext')))
     sections.append((f"过去 {evidence.get('newsLookbackHours', 24)} 小时 · 新闻线索", [f"{item['title']} [{item['id']}]\n{beijing(item['publishedAt'])}（北京时间）"
                     for item in evidence.get('news', [])] or ['本期未检出符合时间窗口的相关新闻；不代表没有市场事件。']))
     sections.append(('数据覆盖与限制', evidence.get('coverage', []) + evidence.get('missing', [])))

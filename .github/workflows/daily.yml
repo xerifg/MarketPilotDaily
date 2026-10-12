@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'test sends one test report; daily respects the email pause setting'
+        description: 'check only diagnoses public sources; test sends a test report; daily respects email pause'
         type: choice
-        options: [test, daily]
+        options: [test, daily, check]
         default: test
       version:
         description: 'Explicit test version; daily always uses version 1'
@@ -35,7 +35,18 @@ jobs:
           python-version: '3.13'
       - name: Install time zone data
         run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Restore latest public industry snapshot
+        id: industry_cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: local-data/public-industry.json
+          key: public-industry-v2-${{ github.run_id }}
+          restore-keys: public-industry-v2-
+      - name: Check public data sources
+        if: github.event.inputs.mode == 'check'
+        run: python -m jobs.check_sources
       - name: Generate and send report
+        if: github.event.inputs.mode != 'check'
         env:
           REPORT_MODE: ${{ github.event.inputs.mode || 'daily' }}
           REPORT_VERSION: ${{ github.event.inputs.version || '1' }}
@@ -45,3 +56,9 @@ jobs:
           MAIL_TO: ${{ secrets.MAIL_TO }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: python -m jobs.daily
+      - name: Save public industry snapshot
+        if: always() && steps.industry_cache.outputs.cache-hit != 'true' && hashFiles('local-data/public-industry.json') != ''
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: local-data/public-industry.json
+          key: public-industry-v2-${{ github.run_id }}

@@ -32,7 +32,7 @@ def flow_highlights(flows):
     if not flows:
         return []
     lines = []
-    for key, title, incoming, outgoing in [('industry', '行业主力', '流入', '流出'), ('etf', '沪市ETF观察池·估算', '净申购', '净赎回')]:
+    for key, title, incoming, outgoing in [('industry', '行业主力', '流入', '流出'), ('etf', '沪深ETF观察池·估算', '净申购', '净赎回')]:
         group = flows[key]
         rows = [row for row in group['rows'] if not row['stale']]
         if not rows:
@@ -48,7 +48,7 @@ def flow_highlights(flows):
     unavailable = sum(not h['flow'] or h['flow']['stale'] for h in flows['holdings'])
     if unavailable:
         lines.append(f'持仓资金：{unavailable}只缺失、偏旧或未覆盖，详情见完整日报。')
-    lines.append('口径：主力为大单交易统计；ETF为份额变化×前日净值估算，不等于现金进出。美股及深市ETF净申赎未覆盖。')
+    lines.append('口径：主力为大单交易统计；ETF为份额变化×前日净值估算，不等于现金进出。美股资金数据未覆盖。')
     return lines
 
 
@@ -58,9 +58,12 @@ def full_flow_sections(flows):
     sections = []
     for key, title in [('industry', '行业资金流向'), ('etf', 'ETF净申赎估算')]:
         group = flows[key]
-        lines = [group['note'], f"统计日 {group['date'] or '未知'}；覆盖 {len(group['rows'])}/{group['expectedCount']}项。"]
+        expected = group['expectedCount'] if group['expectedCount'] is not None else '总数未知'
+        lines = [group['note'], f"统计日 {group['date'] or '未知'}；覆盖 {len(group['rows'])}/{expected}项。"]
         lines += [f"{r['name']}（{r['code']}）｜当日 {amount(r['net'])}｜近5日 {amount(r['net5'])}"
                   + ('｜数据偏旧' if r['stale'] else '') + citations(r) for r in group['rows']]
+        if key == 'etf' and any(row.get('shareSourceUrl') for row in group['rows']):
+            lines.append('份额来源：' + '；'.join(sorted({row['shareSourceUrl'] for row in group['rows'] if row.get('shareSourceUrl')})))
         if not group['rows']:
             lines.append('本次未取得可用数据，不代表零流入。')
         for start in range(0, len(lines), 35):

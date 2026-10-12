@@ -13,6 +13,7 @@ from jobs.market import collect
 from jobs.presentation import report_paragraphs
 from jobs.report import build_report, validate
 from jobs.test_presentation import example_report, SHARE_URL
+from jobs.test_market_context import context_fixture
 
 CUTOFF = datetime(2026, 9, 17, 0, tzinfo=timezone.utc)
 STAMP = int(datetime(2026, 9, 16, 8, tzinfo=timezone.utc).timestamp())
@@ -56,8 +57,9 @@ class FundFlowTests(unittest.TestCase):
         mixed = parse_industries([industry(), industry('BK2', stamp=STAMP - 86400)], CUTOFF)
         self.assertEqual(len(mixed), 1)
 
+    @patch('jobs.fund_flows.industry_cache_path')
     @patch('jobs.fund_flows.fetch_json')
-    def test_pagination_is_complete_and_duplicate_pages_are_rejected(self, fetch):
+    def test_pagination_is_complete_and_duplicate_pages_are_rejected(self, fetch, _cache):
         fetch.side_effect = [dict(data=dict(total=2, diff=[industry('BK1')])), dict(data=dict(total=2, diff=[industry('BK2')]))]
         self.assertEqual(len(read_industries(CUTOFF)['rows']), 2)
         self.assertEqual(fetch.call_args_list[1].args[1]['pn'], 2)
@@ -128,8 +130,9 @@ class FundFlowTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             read_stock(dict(symbol='600519.SH', name='示例'), CUTOFF)
 
+    @patch('jobs.fund_flows.read_cached_industries', return_value=None)
     @patch('jobs.fund_flows.fetch_json', side_effect=OSError('offline'))
-    def test_source_failure_and_unsupported_markets_are_explicit_not_zero(self, _fetch):
+    def test_source_failure_and_unsupported_markets_are_explicit_not_zero(self, _fetch, _cache):
         rows = [dict(symbol='SPY.US', name='US ETF', assetType='etf'),
                 dict(symbol='159915.SZ', name='SZ ETF', assetType='etf')]
         flows = collect_flows(rows, CUTOFF)
@@ -137,7 +140,7 @@ class FundFlowTests(unittest.TestCase):
         self.assertEqual(flows['etf']['status'], 'missing')
         self.assertTrue(all(row['flow'] is None for row in flows['holdings']))
         self.assertIn('美股', flows['holdings'][0]['note'])
-        self.assertIn('深市', flows['holdings'][1]['note'])
+        self.assertIn('未配齐', flows['holdings'][1]['note'])
 
     def test_both_mail_parts_get_only_flow_highlights_even_when_ai_fails(self):
         report = example_report()
@@ -170,6 +173,7 @@ class FundFlowTests(unittest.TestCase):
         self.assertLess(len(paragraphs), 100)
 
     @patch('jobs.market.collect_flows', return_value=flows_fixture())
+    @patch('jobs.market_context.collect_context', return_value=context_fixture())
     @patch('jobs.market.read_quote', side_effect=lambda symbol, cutoff: dict(symbol=symbol, missing=True, sourceUrl='https://example.com/quote'))
     @patch('jobs.market.fetch', return_value=b'<rss/>')
     @patch('jobs.market.parse_feed', return_value=[dict(title='market', summary='x', url='https://example.com/news', publishedAt=CUTOFF.isoformat()) for _ in range(5)])
